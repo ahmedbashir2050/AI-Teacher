@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+qdrant-client
+langchain
+langchain-text-splitters
+python-multipart
+psycopg2-binary
+fastapi-jwt-auth
+pdfminer.six
+sentence-transformers
+pytest
+openai
