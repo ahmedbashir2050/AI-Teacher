@@ -1,8 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
+import sys
+import os
 
-# Correctly import the app from the 'src' directory
+# Explicitly add the 'src' directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 from app.main import app
 
 client = TestClient(app)
@@ -20,13 +24,10 @@ def mock_llm_service():
 @pytest.fixture
 def mock_retriever():
     """Mocks the retrieve_relevant_chunks function used in various API modules."""
-    # We need to patch the retriever where it's looked up, which is in the API modules.
-    # To be safe, we'll patch it in all modules that use it.
     with patch('app.api.chat.retrieve_relevant_chunks') as mock_chat, \
          patch('app.api.summarize.retrieve_relevant_chunks') as mock_summarize, \
          patch('app.api.flashcards.retrieve_relevant_chunks') as mock_flashcards, \
          patch('app.api.exam.retrieve_relevant_chunks') as mock_exam:
-        # Yield a single mock that can be configured for all
         mock_chat.return_value = ["Mocked chunk"]
         mock_summarize.return_value = ["Mocked chunk"]
         mock_flashcards.return_value = ["Mocked chunk"]
