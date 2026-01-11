@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api import academic, admin, chat
 from app.core.database import engine
-from app.models import academic as academic_models, user as user_models
+from app.models import academic as academic_models, user as user_models, chat as chat_models
 
 from app.core.qdrant_db import create_collection_if_not_exists
 
@@ -11,6 +11,7 @@ async def lifespan(app: FastAPI):
     # Startup
     # Table creation is handled by the test setup (conftest.py) for testing
     # and should be handled by a migration tool (like Alembic) in production.
+    create_collection_if_not_exists()
     yield
     # Shutdown
 

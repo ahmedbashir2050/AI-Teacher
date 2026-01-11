@@ -1,12 +1,10 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
-import uuid
-
 class UserBase(BaseModel):
     role: str
-    faculty_id: Optional[uuid.UUID] = None
-    department_id: Optional[uuid.UUID] = None
+    college_id: Optional[int] = None
+    department_id: Optional[int] = None
 
 class UserCreate(UserBase):
     pass
