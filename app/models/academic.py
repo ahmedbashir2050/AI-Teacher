@@ -1,48 +1,43 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, String, ForeignKey, DateTime, UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 import datetime
+import uuid
 
-class College(Base):
-    __tablename__ = "colleges"
-    id = Column(Integer, primary_key=True, index=True)
+class Faculty(Base):
+    __tablename__ = "faculties"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, index=True)
-    departments = relationship("Department", back_populates="college")
-    users = relationship("User", back_populates="college")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    departments = relationship("Department", back_populates="faculty")
+    users = relationship("User", back_populates="faculty")
 
 
 class Department(Base):
     __tablename__ = "departments"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, index=True)
-    college_id = Column(Integer, ForeignKey("colleges.id"))
-    college = relationship("College", back_populates="departments")
+    faculty_id = Column(UUID(as_uuid=True), ForeignKey("faculties.id"))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    faculty = relationship("Faculty", back_populates="departments")
     semesters = relationship("Semester", back_populates="department")
     users = relationship("User", back_populates="department")
 
 class Semester(Base):
     __tablename__ = "semesters"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, index=True)
-    department_id = Column(Integer, ForeignKey("departments.id"))
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
     department = relationship("Department", back_populates="semesters")
-    courses = relationship("Course", back_populates="semester")
-
-class Course(Base):
-    __tablename__ = "courses"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    code = Column(String, unique=True, index=True)
-    semester_id = Column(Integer, ForeignKey("semesters.id"))
-    semester = relationship("Semester", back_populates="courses")
-    books = relationship("Book", back_populates="course")
+    books = relationship("Book", back_populates="semester")
 
 class Book(Base):
     __tablename__ = "books"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String, index=True)
     language = Column(String)
-    course_id = Column(Integer, ForeignKey("courses.id"))
-    course = relationship("Course", back_populates="books")
-    uploaded_by = Column(String) # Assuming admin_id is a string
+    semester_id = Column(UUID(as_uuid=True), ForeignKey("semesters.id"))
+    qdrant_collection = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    semester = relationship("Semester", back_populates="books")

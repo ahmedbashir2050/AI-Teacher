@@ -12,3 +12,4 @@ pdfminer.six
 sentence-transformers
 pytest
 openai
+google-cloud-firestore

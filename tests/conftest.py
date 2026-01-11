@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from sqlalchemy.orm import sessionmaker
 import os
+import uuid
 
 # Set the database URL for testing BEFORE importing anything from the app
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
@@ -12,7 +13,7 @@ patcher = patch('app.core.qdrant_db.get_qdrant_client', return_value=MagicMock()
 patcher.start()
 
 # Explicitly import all models to ensure they are registered with Base.metadata
-from app.models import academic, user, chat
+from app.models import academic, user
 
 from app.main import app
 from app.api.dependencies import get_db
@@ -41,12 +42,14 @@ def client():
     # Populate the test database with initial data
     db = TestingSessionLocal()
     user_service.create_user(db, user_schemas.UserCreate(role="admin"), "admin_user_id")
+    user_service.create_user(db, user_schemas.UserCreate(role="academic"), "academic_user_id")
     user_service.create_user(db, user_schemas.UserCreate(role="student"), "student_user_id")
-    academic_service.create_college(db, academic_schemas.CollegeCreate(name="Test College"))
-    academic_service.create_department(db, academic_schemas.DepartmentCreate(name="Test Department", college_id=1))
-    academic_service.create_semester(db, academic_schemas.SemesterCreate(name="Test Semester", department_id=1))
-    academic_service.create_course(db, academic_schemas.CourseCreate(name="Test Course", code="TC101", semester_id=1))
-    academic_service.create_book(db, academic_schemas.BookCreate(title="Test Book", language="English", course_id=1), "admin_user_id")
+
+    faculty = academic_service.create_faculty(db, academic_schemas.FacultyCreate(name="Test Faculty"))
+    department = academic_service.create_department(db, academic_schemas.DepartmentCreate(name="Test Department", faculty_id=faculty.id))
+    semester = academic_service.create_semester(db, academic_schemas.SemesterCreate(name="Test Semester", department_id=department.id))
+    academic_service.create_book(db, academic_schemas.BookCreate(title="Test Book", language="English", semester_id=semester.id), "faculty_123_semester_456", uuid.uuid4())
+
     db.commit()
     db.close()
 

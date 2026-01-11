@@ -1,66 +1,57 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 import datetime
+import uuid
 
-class CollegeBase(BaseModel):
+class FacultyBase(BaseModel):
     name: str
 
-class CollegeCreate(CollegeBase):
+class FacultyCreate(FacultyBase):
     pass
 
-class College(CollegeBase):
-    id: int
+class Faculty(FacultyBase):
+    id: uuid.UUID
+    created_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 class DepartmentBase(BaseModel):
     name: str
-    college_id: int
+    faculty_id: uuid.UUID
 
 class DepartmentCreate(DepartmentBase):
     pass
 
 class Department(DepartmentBase):
-    id: int
+    id: uuid.UUID
+    created_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 class SemesterBase(BaseModel):
     name: str
-    department_id: int
+    department_id: uuid.UUID
 
 class SemesterCreate(SemesterBase):
     pass
 
 class Semester(SemesterBase):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-class CourseBase(BaseModel):
-    name: str
-    code: str
-    semester_id: int
-
-class CourseCreate(CourseBase):
-    pass
-
-class Course(CourseBase):
-    id: int
+    id: uuid.UUID
+    created_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 class BookBase(BaseModel):
     title: str
     language: str
-    course_id: int
+    semester_id: uuid.UUID
 
 class BookCreate(BookBase):
     pass
 
 class Book(BookBase):
-    id: int
-    uploaded_by: str
+    id: uuid.UUID
+    qdrant_collection: str
     created_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
