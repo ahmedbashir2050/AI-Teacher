@@ -4,6 +4,8 @@ from app.schemas import chat as chat_schemas
 from app.core.qdrant_db import get_qdrant_client, COLLECTION_NAME
 from qdrant_client import models
 from sentence_transformers import SentenceTransformer
+import os
+from openai import OpenAI
 
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -41,9 +43,6 @@ def search_book_chunks(book_id: int, query: str, top_k: int = 3):
         limit=top_k
     )
     return [hit.payload['text'] for hit in search_result]
-
-import os
-from openai import OpenAI
 
 def generate_response(chat_history: list, retrieved_chunks: list, user_question: str) -> str:
     """
