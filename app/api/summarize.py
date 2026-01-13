@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.models.requests import SummarizeRequest
 from app.models.responses import SummarizeResponse
 from app.rag.retriever import retrieve_relevant_chunks
 from app.services.llm_service import llm_service
+from app.core.security import STUDENT_ACCESS
+from app.core.cache import get_cache, set_cache
 
 router = APIRouter()
 
@@ -25,14 +27,18 @@ Text:
     return prompt.strip()
 
 @router.post("/summarize", response_model=SummarizeResponse)
-async def summarize_chapter(request: SummarizeRequest):
+async def summarize_chapter(request: SummarizeRequest, current_user: dict = STUDENT_ACCESS):
     """
     Generates a summary for a given chapter based on retrieved content.
+    Caches the result to improve performance on subsequent requests.
     """
+    cache_key = f"summary:{request.chapter}:{request.style}"
+    cached_summary = get_cache(cache_key)
+    if cached_summary:
+        return SummarizeResponse(summary=cached_summary)
+
     try:
         # Retrieve context for the entire chapter
-        # Note: This is a simplification. A real implementation might need a
-        # more robust way to identify all chunks for a "chapter".
         relevant_chunks = retrieve_relevant_chunks(f"Summary of {request.chapter}", top_k=10)
 
         if not relevant_chunks:
@@ -40,6 +46,9 @@ async def summarize_chapter(request: SummarizeRequest):
 
         prompt = create_summarize_prompt(relevant_chunks, request.style)
         summary = llm_service.get_chat_completion(prompt)
+
+        # Cache the new summary
+        set_cache(cache_key, summary, ttl=3600)
 
         return SummarizeResponse(summary=summary)
 

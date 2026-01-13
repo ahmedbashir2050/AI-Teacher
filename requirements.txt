@@ -11,3 +11,15 @@ pytest
 httpx
 langchain-text-splitters
 python-multipart
+
+# Added for hardening
+python-json-logger
+fastapi-limiter
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+sentry-sdk
+opentelemetry-instrumentation-fastapi
+redis
+celery
+tenacity

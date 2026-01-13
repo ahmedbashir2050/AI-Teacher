@@ -89,3 +89,6 @@ qdrant_storage/
 # IDE-specific
 .idea/
 .vscode/
+
+# Data files
+users.json

@@ -13,6 +13,7 @@ services:
       - .env
     depends_on:
       - qdrant
+      - redis
     networks:
       - ai-teacher-net
 
@@ -23,6 +24,13 @@ services:
       - "6334:6334"
     volumes:
       - ./qdrant_storage:/qdrant/storage
+    networks:
+      - ai-teacher-net
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
     networks:
       - ai-teacher-net
 

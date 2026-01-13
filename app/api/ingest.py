@@ -1,63 +1,26 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.rag.loader import load_pdf
-from app.rag.chunker import chunk_text
-from app.rag.embeddings import generate_embedding
-from app.services.qdrant_service import qdrant_service
-from qdrant_client import models
-import uuid
-import io
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
+from app.models.responses import MessageResponse
+from app.core.security import ADMIN_ACCESS
+from app.main import limiter
+from app.tasks import process_document_task
 
 router = APIRouter()
 
-@router.post("/ingest", status_code=201)
-async def ingest_document(file: UploadFile = File(...)):
+@router.post("/ingest", response_model=MessageResponse, status_code=202)
+@limiter.limit("5/hour")
+async def ingest_document(request: Request, file: UploadFile = File(...), current_user: dict = ADMIN_ACCESS):
     """
-    Processes and ingests a new curriculum document.
+    Accepts a PDF document and offloads its processing and ingestion to a background worker.
+    Requires ADMIN access.
     """
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     try:
-        # 1. Load and Chunk
         file_content = await file.read()
-        text = load_pdf(io.BytesIO(file_content))
-        chunks = chunk_text(text)
-
-        if not chunks:
-            raise HTTPException(status_code=400, detail="Could not extract text from the PDF.")
-
-        # 2. Generate Embeddings and prepare for Qdrant
-        points = []
-        # Get the embedding size from the first chunk
-        first_vector = generate_embedding(chunks[0])
-        vector_size = len(first_vector)
-        qdrant_service.create_collection_if_not_exists(vector_size=vector_size)
-
-        # Add the first point
-        points.append(models.PointStruct(
-            id=str(uuid.uuid4()),
-            vector=first_vector,
-            payload={"text": chunks[0], "source": file.filename}
-        ))
-
-        # Process the rest of the chunks
-        for i in range(1, len(chunks)):
-            chunk = chunks[i]
-            vector = generate_embedding(chunk)
-            point = models.PointStruct(
-                id=str(uuid.uuid4()),
-                vector=vector,
-                payload={"text": chunk, "source": file.filename}
-            )
-            points.append(point)
-
-        # 3. Upsert to Qdrant
-        if points:
-            qdrant_service.upsert_points(points)
-
-        return {"message": f"Successfully ingested {len(chunks)} chunks from {file.filename}."}
+        process_document_task.delay(file_content, file.filename)
+        return {"message": f"Document '{file.filename}' received and is being processed in the background."}
 
     except Exception as e:
-        # Log the error for debugging
-        print(f"Ingestion error: {e}")
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+        print(f"Ingestion submission error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue the document for processing.")

@@ -23,3 +23,10 @@ class ExamQuestion(BaseModel):
 class ExamResponse(BaseModel):
     exam_title: str
     questions: List[ExamQuestion]
+
+class UserResponse(BaseModel):
+    username: str
+    role: str
+
+class MessageResponse(BaseModel):
+    message: str
