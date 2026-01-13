@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
+from uuid import UUID
 
 class ChatResponse(BaseModel):
     answer: str
+    session_id: UUID
 
 class SummarizeResponse(BaseModel):
     summary: str
@@ -21,8 +23,14 @@ class ExamQuestion(BaseModel):
     correct_answer: str
 
 class ExamResponse(BaseModel):
+    exam_id: int
     exam_title: str
     questions: List[ExamQuestion]
+
+class ExamResultResponse(BaseModel):
+    attempt_id: int
+    score: int
+    total_questions: int
 
 class UserResponse(BaseModel):
     username: str

@@ -19,7 +19,9 @@ async def chat_with_teacher(request: Request, chat_request: ChatRequest, db: Ses
     from the curriculum, generating a grounded answer, and saving the conversation.
     """
     try:
-        assistant_message, session_id = chat_service.handle_chat_message(db, current_user, chat_request.session_id, chat_request.question)
+        assistant_message, session_id = chat_service.handle_chat_message(db, current_user, chat_request.session_id, chat_request.question, chat_request.book_id)
+        if not session_id:
+            raise HTTPException(status_code=404, detail=assistant_message)
         return ChatResponse(answer=assistant_message, session_id=session_id)
     except Exception as e:
         # Log the error for debugging

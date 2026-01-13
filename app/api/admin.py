@@ -3,7 +3,9 @@ from app.models.responses import MessageResponse
 from app.core.security import ADMIN_ACCESS
 from app.config import settings
 from datetime import datetime, timedelta
-from app.api.auth import get_dummy_users_db
+from app.repository import user_repository
+from app.db.session import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -24,15 +26,16 @@ async def export_audit_logs(current_user: dict = ADMIN_ACCESS):
     raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="This feature is not yet implemented.")
 
 @router.put("/admin/deactivate-user/{user_id}", response_model=MessageResponse)
-async def deactivate_user(user_id: str, current_user: dict = ADMIN_ACCESS):
+async def deactivate_user(user_id: int, db: Session = Depends(get_db), current_user: dict = ADMIN_ACCESS):
     """
     Deactivates a user.
     Requires ADMIN access.
     """
-    DUMMY_USERS_DB = get_dummy_users_db()
-    if user_id not in DUMMY_USERS_DB:
+    user = user_repository.get_user_by_id(db, user_id=user_id)
+    if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    DUMMY_USERS_DB[user_id]["disabled"] = True
+    user.disabled = True
+    db.commit()
 
-    return {"message": f"User '{user_id}' has been deactivated."}
+    return {"message": f"User '{user.username}' has been deactivated."}

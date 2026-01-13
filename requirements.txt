@@ -1,4 +1,4 @@
-fastapi
+fastapi[all]
 uvicorn[standard]
 qdrant-client
 openai
@@ -11,8 +11,6 @@ pytest
 httpx
 langchain-text-splitters
 python-multipart
-
-# Added for hardening
 python-json-logger
 fastapi-limiter
 pydantic-settings
@@ -20,12 +18,11 @@ python-jose[cryptography]
 passlib[bcrypt]
 sentry-sdk
 opentelemetry-instrumentation-fastapi
+opentelemetry-sdk
 redis
 celery
 tenacity
-fastapi[all]
-pytest
-python-dotenv
-SQLAlchemy
+sqlalchemy
+alembic
 psycopg2-binary
-opentelemetry-sdk
+slowapi

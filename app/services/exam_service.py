@@ -6,6 +6,7 @@ from app.models.db import Book, User
 from app.models.requests import ExamRequest
 import json
 from openai import APIError
+from app.repository import book_repository
 
 def create_exam_prompt(context: list[str], mcq_count: int, theory_count: int) -> str:
     context_str = "\n\n".join(context)
@@ -26,8 +27,12 @@ Academic Text:
 """
     return prompt.strip()
 
-def generate_and_store_exam(db: Session, book: Book, exam_request: ExamRequest):
-    relevant_chunks = retrieve_relevant_chunks(f"Exam material for {exam_request.chapter}", top_k=15)
+def generate_and_store_exam(db: Session, exam_request: ExamRequest):
+    book = book_repository.get_book_by_id(db, book_id=exam_request.book_id)
+    if not book:
+        return None
+
+    relevant_chunks = retrieve_relevant_chunks(f"Exam material for {exam_request.chapter}", top_k=15, collection_name=book.qdrant_collection_name)
 
     if not relevant_chunks:
         return None
