@@ -1,12 +1,12 @@
 from fastapi import FastAPI, Request
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
-from app.core.config import settings
+from app.config import settings
 from app.api import chat, summarize, exam, flashcards, ingest, auth, admin
 from app.core.security import get_current_user
 from app.core.logging import get_logger
+from app.core.limiter import limiter
 import time
 import uuid
 import sentry_sdk
@@ -24,18 +24,6 @@ if settings.SENTRY_DSN:
         profiles_sample_rate=1.0,
         environment=settings.ENVIRONMENT,
     )
-
-def rate_limit_key_func(request: Request) -> str:
-    """
-    Key function for rate limiting.
-    Prioritizes username from JWT, falls back to IP address.
-    """
-    username = get_username_from_request(request)
-    if username:
-        return username
-    return get_remote_address(request)
-
-limiter = Limiter(key_func=rate_limit_key_func, storage_uri=settings.REDIS_URL)
 
 app = FastAPI(
     title="AI Teacher API",

@@ -1,5 +1,5 @@
 from celery import Celery
-from app.core.config import settings
+from app.config import settings
 
 """
 Celery worker configuration and entrypoint.

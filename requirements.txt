@@ -23,3 +23,9 @@ opentelemetry-instrumentation-fastapi
 redis
 celery
 tenacity
+fastapi[all]
+pytest
+python-dotenv
+SQLAlchemy
+psycopg2-binary
+opentelemetry-sdk

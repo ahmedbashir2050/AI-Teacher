@@ -1,6 +1,21 @@
+import os
+from dotenv import load_dotenv
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Set environment variables for testing
+os.environ["POSTGRES_URL"] = "postgresql://user:password@localhost/db"
+os.environ["DATABASE_URL"] = "postgresql://user:password@localhost/db"
+os.environ["OPENAI_API_KEY"] = "dummy_key"
+os.environ["JWT_SECRET_KEY"] = "dummy_secret"
+os.environ["JWT_AUDIENCE"] = "dummy_audience"
+os.environ["JWT_ISSUER"] = "dummy_issuer"
+os.environ["CELERY_BROKER_URL"] = "redis://localhost:6379/0"
+os.environ["CELERY_RESULT_BACKEND"] = "redis://localhost:6379/0"
 
 # Correctly import the app from the 'src' directory
 from app.main import app

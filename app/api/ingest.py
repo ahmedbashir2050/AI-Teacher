@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from app.models.responses import MessageResponse
 from app.core.security import ADMIN_ACCESS
-from app.main import limiter
+from app.core.limiter import limiter
 from app.tasks import process_document_task
 
 router = APIRouter()
