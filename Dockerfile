@@ -1,24 +1,32 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# --- Build Stage ---
+FROM python:3.11-slim as builder
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the dependencies file to the working directory
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Install build dependencies
+RUN pip install --upgrade pip
+
+# Copy and install dependencies
 COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# --- Final Stage ---
+FROM python:3.11-slim
 
-# Copy the rest of the application's code to the working directory
-# Note: We copy the 'app' directory into a subdirectory of the same name inside the container
+WORKDIR /app
+
+# Copy built wheels from builder stage
+COPY --from=builder /app/wheels /wheels
+
+# Install production dependencies from wheels
+RUN pip install --no-cache /wheels/*
+
+# Copy application code
 COPY ./app /app/app
 
-# Set the PYTHONPATH to the working directory to ensure module resolution
-ENV PYTHONPATH=.
-
-# Expose the port the app runs on
-EXPOSE 8000
-
-# Run the command to start the server
+# Set the entrypoint
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

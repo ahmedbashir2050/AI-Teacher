@@ -1,14 +1,17 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Request
 from app.models.requests import ChatRequest
 from app.models.responses import ChatResponse
 from app.rag.retriever import retrieve_relevant_chunks
 from app.rag.prompt import create_teacher_prompt
 from app.services.llm_service import llm_service
+from app.core.security import STUDENT_ACCESS
+from app.main import limiter
 
 router = APIRouter()
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_with_teacher(request: ChatRequest):
+@limiter.limit("5/minute")
+async def chat_with_teacher(request: Request, chat_request: ChatRequest, current_user: dict = STUDENT_ACCESS):
     """
     Handles a student's question by retrieving relevant context
     from the curriculum and generating a grounded answer.

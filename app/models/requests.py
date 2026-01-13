@@ -1,8 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8, max_length=100)
+
 class ChatRequest(BaseModel):
-    question: str = Field(..., min_length=1, description="The question to ask the AI Teacher.")
+    question: str = Field(..., min_length=1, max_length=1000, description="The question to ask the AI Teacher.")
 
 class SummarizeRequest(BaseModel):
     chapter: str = Field(..., min_length=1, description="The chapter to summarize.")
