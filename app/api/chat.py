@@ -1,37 +1,26 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from app.models.requests import ChatRequest
 from app.models.responses import ChatResponse
-from app.rag.retriever import retrieve_relevant_chunks
-from app.rag.prompt import create_teacher_prompt
-from app.services.llm_service import llm_service
+from app.services import chat_service
 from app.core.security import STUDENT_ACCESS
-from app.main import limiter
+from app.core.limiter import limiter
+from app.db.session import get_db
+from sqlalchemy.orm import Session
+from app.models.db import User
+from uuid import UUID
 
 router = APIRouter()
 
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit("5/minute")
-async def chat_with_teacher(request: Request, chat_request: ChatRequest, current_user: dict = STUDENT_ACCESS):
+async def chat_with_teacher(request: Request, chat_request: ChatRequest, db: Session = Depends(get_db), current_user: User = Depends(STUDENT_ACCESS)):
     """
     Handles a student's question by retrieving relevant context
-    from the curriculum and generating a grounded answer.
+    from the curriculum, generating a grounded answer, and saving the conversation.
     """
     try:
-        # 1. Retrieve relevant context
-        relevant_chunks = retrieve_relevant_chunks(request.question)
-
-        if not relevant_chunks:
-            # If no context is found, respond according to the strict rule
-            return ChatResponse(answer="هذا السؤال خارج المقرر")
-
-        # 2. Create the prompt with the retrieved context
-        prompt = create_teacher_prompt(relevant_chunks, request.question)
-
-        # 3. Get the answer from the LLM
-        answer = llm_service.get_chat_completion(prompt)
-
-        return ChatResponse(answer=answer)
-
+        assistant_message, session_id = chat_service.handle_chat_message(db, current_user, chat_request.session_id, chat_request.question)
+        return ChatResponse(answer=assistant_message, session_id=session_id)
     except Exception as e:
         # Log the error for debugging
         print(f"Chat endpoint error: {e}")

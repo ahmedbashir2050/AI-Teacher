@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient, models
-from app.config import QDRANT_URL
+from app.config import settings
 import logging
 
 # Configure logging
@@ -11,8 +11,8 @@ class QdrantService:
         """
         Initializes the QdrantService.
         """
-        logger.info(f"Connecting to Qdrant at {QDRANT_URL}")
-        self.client = QdrantClient(url=QDRANT_URL)
+        logger.info(f"Connecting to Qdrant at {settings.QDRANT_URL}")
+        self.client = QdrantClient(url=settings.QDRANT_URL)
         self.collection_name = collection_name
 
     def create_collection_if_not_exists(self, vector_size: int, distance=models.Distance.COSINE):

@@ -2,6 +2,8 @@ import os
 from pydantic_settings import BaseSettings
 from typing import ClassVar
 
+from pathlib import Path
+
 class Settings(BaseSettings):
     # Environment settings
     ENVIRONMENT: str = "development"
@@ -11,6 +13,7 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     REDIS_URL: str = "redis://localhost:6379"
     POSTGRES_URL: str
+    DATABASE_URL: str
     SENTRY_DSN: str = ""
 
     # JWT settings
@@ -29,11 +32,11 @@ class Settings(BaseSettings):
     CHAT_HISTORY_RETENTION_DAYS: int = 30
 
     # Default user passwords
-    ADMIN_DEFAULT_PASSWORD: str = "adminpassword"
-    STUDENT_DEFAULT_PASSWORD: str = "studentpassword"
+    ADMIN_DEFAULT_PASSWORD: str = "admin"
+    STUDENT_DEFAULT_PASSWORD: str = "student"
 
     class Config:
-        env_file = ".env"
+        env_file = Path(__file__).parent.parent / ".env"
         env_file_encoding = 'utf-8'
         extra = 'ignore'
 

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.responses import MessageResponse
 from app.core.security import ADMIN_ACCESS
-from app.core.config import settings
+from app.config import settings
 from datetime import datetime, timedelta
-from app.api.auth import DUMMY_USERS_DB
+from app.api.auth import get_dummy_users_db
 
 router = APIRouter()
 
@@ -29,6 +29,7 @@ async def deactivate_user(user_id: str, current_user: dict = ADMIN_ACCESS):
     Deactivates a user.
     Requires ADMIN access.
     """
+    DUMMY_USERS_DB = get_dummy_users_db()
     if user_id not in DUMMY_USERS_DB:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 

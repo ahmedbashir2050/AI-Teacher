@@ -5,7 +5,11 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 from enum import Enum
-from app.core.config import settings
+from app.config import settings
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.models.db import User
+from app.repository import chat_repository
 
 # --- User Roles ---
 class UserRole(str, Enum):
@@ -78,7 +82,7 @@ def decode_token(token: str) -> TokenData | None:
         return None
 
 # --- Dependency for getting current user ---
-def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
+def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -87,14 +91,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
     token_data = decode_token(token)
     if token_data is None:
         raise credentials_exception
-    # In a real app, you would fetch the user from the database here
-    # to ensure they exist and are active.
-    # For now, we trust the token data.
-    return token_data
+
+    user = chat_repository.get_user_by_username(db, username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
 
 # --- Role-based Access Control Dependencies ---
 def require_role(required_roles: list[UserRole]):
-    def role_checker(current_user: TokenData = Depends(get_current_user)) -> TokenData:
+    def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in required_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -103,6 +108,6 @@ def require_role(required_roles: list[UserRole]):
         return current_user
     return role_checker
 
-ADMIN_ACCESS = Depends(require_role([UserRole.ADMIN]))
-ACADEMIC_ACCESS = Depends(require_role([UserRole.ADMIN, UserRole.ACADEMIC]))
-STUDENT_ACCESS = Depends(require_role([UserRole.ADMIN, UserRole.ACADEMIC, UserRole.STUDENT]))
+ADMIN_ACCESS = require_role([UserRole.ADMIN])
+ACADEMIC_ACCESS = require_role([UserRole.ADMIN, UserRole.ACADEMIC])
+STUDENT_ACCESS = require_role([UserRole.ADMIN, UserRole.ACADEMIC, UserRole.STUDENT])
