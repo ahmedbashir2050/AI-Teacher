@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session
 from app.repository import exam_repository
 from app.rag.retriever import retrieve_relevant_chunks
 from app.services.llm_service import llm_service
-from app.models.db import Book, User
+from app.models.academics import Book
+from app.models.user import User
 from app.models.requests import ExamRequest
 import json
 from openai import APIError

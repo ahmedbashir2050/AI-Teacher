@@ -7,10 +7,17 @@ from alembic import context
 
 import os
 import sys
+
+# Ensure the project root is in the Python path.
+# This allows Alembic to find the 'app' module.
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from app.db.base import Base
 from app.config import settings
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+# Import the models package. This is crucial for Alembic's autogenerate to
+# detect the models and their metadata. The __init__.py file in app/models
+# ensures all model classes are loaded.
+from app import models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

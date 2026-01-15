@@ -3,6 +3,16 @@ from pydantic_settings import BaseSettings
 from typing import ClassVar
 
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Use pathlib to find the project root and load the .env file
+# This makes the .env loading robust and independent of the working directory
+# from which scripts/apps are run.
+
+project_root = Path(__file__).parent.parent
+dotenv_path = project_root / ".env"
+load_dotenv(dotenv_path=dotenv_path)
+
 
 class Settings(BaseSettings):
     # Environment settings
@@ -36,7 +46,7 @@ class Settings(BaseSettings):
     STUDENT_DEFAULT_PASSWORD: str = "student"
 
     class Config:
-        env_file = Path(__file__).parent.parent / ".env"
+        env_file = dotenv_path
         env_file_encoding = 'utf-8'
         extra = 'ignore'
 

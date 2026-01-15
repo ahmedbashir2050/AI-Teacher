@@ -5,7 +5,8 @@ from app.services import exam_service
 from app.core.security import STUDENT_ACCESS
 from app.db.session import get_db
 from sqlalchemy.orm import Session
-from app.models.db import User, Book
+from app.models.user import User
+from app.models.academics import Book
 from app.repository import exam_repository
 
 router = APIRouter()

@@ -3,7 +3,8 @@ from app.repository import chat_repository
 from app.rag.retriever import retrieve_relevant_chunks
 from app.rag.prompt import create_teacher_prompt
 from app.services.llm_service import llm_service
-from app.models.db import User, Book
+from app.models.user import User
+from app.models.academics import Book
 from uuid import UUID
 from app.repository import book_repository
 from app.repository import chat_repository
