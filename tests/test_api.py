@@ -1,11 +1,7 @@
 import os
-from dotenv import load_dotenv
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Set environment variables for testing
 os.environ["POSTGRES_URL"] = "postgresql://user:password@localhost/db"
