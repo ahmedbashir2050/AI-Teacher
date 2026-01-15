@@ -1,0 +1,53 @@
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]
+
+[project]
+name = "ai_teacher"
+version = "0.1.0"
+description = "AI Teacher Backend"
+authors = [
+    {name = "Jules", email = "jules@example.com"},
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[all]",
+    "uvicorn[standard]",
+    "qdrant-client",
+    "openai",
+    "pypdf",
+    "langchain",
+    "python-dotenv",
+    "langchain-openai",
+    "tiktoken",
+    "pytest",
+    "httpx",
+    "langchain-text-splitters",
+    "python-multipart",
+    "python-json-logger",
+    "fastapi-limiter",
+    "pydantic-settings",
+    "python-jose[cryptography]",
+    "passlib==1.7.4",
+    "bcrypt==3.2.2",
+    "sentry-sdk",
+    "opentelemetry-instrumentation-fastapi",
+    "opentelemetry-sdk",
+    "redis",
+    "celery",
+    "tenacity",
+    "sqlalchemy",
+    "alembic",
+    "psycopg2-binary",
+    "slowapi",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "isort",
+    "flake8",
+]

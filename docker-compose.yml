@@ -26,6 +26,20 @@ services:
       - ./qdrant_storage:/qdrant/storage
     networks:
       - ai-teacher-net
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=db
+    networks:
+      - ai-teacher-net
 
   redis:
     image: redis:latest
@@ -33,6 +47,25 @@ services:
       - "6379:6379"
     networks:
       - ai-teacher-net
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["celery", "-A", "app.core.celery_worker.celery_app", "worker", "--loglevel=info"]
+    volumes:
+      - ./app:/app/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - ai-teacher-net
+
+volumes:
+  postgres_data:
+  qdrant_storage:
 
 networks:
   ai-teacher-net:

@@ -2,29 +2,20 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 from enum import Enum
 from app.config import settings
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.db import User
-from app.repository import chat_repository
+from app.models.user import User
+from app.repository import user_repository
+from .hashing import verify_password
 
 # --- User Roles ---
 class UserRole(str, Enum):
     ADMIN = "admin"
     ACADEMIC = "academic"
     STUDENT = "student"
-
-# --- Password Hashing ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
 
 # --- JWT Token Handling ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -92,7 +83,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     if token_data is None:
         raise credentials_exception
 
-    user = chat_repository.get_user_by_username(db, username=token_data.username)
+    user = user_repository.get_user_by_username(db, username=token_data.username)
     if user is None:
         raise credentials_exception
     return user

@@ -6,7 +6,7 @@ from app.core.security import STUDENT_ACCESS
 from app.core.limiter import limiter
 from app.db.session import get_db
 from sqlalchemy.orm import Session
-from app.models.db import User
+from app.models.user import User
 from uuid import UUID
 
 router = APIRouter()
