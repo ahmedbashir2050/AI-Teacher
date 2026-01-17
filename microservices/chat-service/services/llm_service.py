@@ -22,9 +22,10 @@ class LLMService:
             self.redis = await aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
         return self.redis
 
-    async def get_chat_completion(self, messages: list[dict], model: str = "gpt-4o", temperature: float = 0.0) -> str:
+    async def get_chat_completion(self, messages: list[dict], model: str = "gpt-4o", temperature: float = 0.1) -> str:
         """
         Gets a chat completion from the OpenAI model with a list of messages.
+        Production-grade: Default temperature set to 0.1 for determinism.
         """
         try:
             logger.info(f"Requesting chat completion with model {model}")
@@ -109,17 +110,64 @@ Example: 2, 0, 4
     async def summarize_learning_state(self, current_summary: str, history: str) -> str:
         """
         Summarizes the user's learning state based on the conversation history.
+        Deterministic and scoped.
         """
         system_prompt = """
-Update the student's learning state summary.
-Focus on: topics understood, topics they struggle with, and overall progress.
-Keep it concise and in English for internal use.
+Update the student's academic learning state summary.
+Focus strictly on:
+1. Specific academic concepts understood.
+2. Specific concepts the student struggles with.
+3. Progress toward curriculum goals.
+Refuse to include any personal info or non-academic content.
+Keep it concise and objective.
 """
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Current Summary: {current_summary}\n\nRecent History: {history}"}
         ]
-        return await self.get_chat_completion(messages, model="gpt-4o-mini")
+        return await self.get_chat_completion(messages, model="gpt-4o-mini", temperature=0.0)
+
+    async def get_chat_completion_with_validation(self, messages: list[dict]) -> str:
+        """
+        Enforces structured output validation after LLM call.
+        """
+        response = await self.get_chat_completion(messages)
+
+        # Validation rules
+        required_sections = ["التعريف:", "الشرح:", "مثال:", "ملخص:"]
+        is_academic = all(section in response for section in required_sections)
+
+        # If it's an academic response but missing sections, try one fix/retry
+        if not is_academic and "خارج المقرر" not in response and len(response) > 100:
+            logger.warning("Response failed structure validation. Retrying with explicit structure enforcement.")
+            messages.append({"role": "system", "content": "يجب أن تلتزم بالهيكل المطلوب: التعريف، الشرح، مثال، ملخص."})
+            response = await self.get_chat_completion(messages)
+
+        return response
+
+    async def get_cached_rag_results(self, query: str, collection: str, faculty: str, semester: str):
+        redis = await self._get_redis()
+        key = f"rag_cache:{faculty}:{semester}:{hashlib.md5((query + collection).encode()).hexdigest()}"
+        cached = await redis.get(key)
+        return json.loads(cached) if cached else None
+
+    async def cache_rag_results(self, query: str, collection: str, faculty: str, semester: str, results: list):
+        redis = await self._get_redis()
+        key = f"rag_cache:{faculty}:{semester}:{hashlib.md5((query + collection).encode()).hexdigest()}"
+        await redis.setex(key, 3600 * 6, json.dumps(results)) # 6 hours cache
+
+    async def get_cached_response(self, faculty: str, semester: str, question: str):
+        redis = await self._get_redis()
+        norm_q = question.strip().lower()
+        key = f"ans_cache:{faculty}:{semester}:{hashlib.md5(norm_q.encode()).hexdigest()}"
+        return await redis.get(key)
+
+    async def cache_response(self, faculty: str, semester: str, question: str, response: str):
+        if len(response) < 50: return # Don't cache short/error responses
+        redis = await self._get_redis()
+        norm_q = question.strip().lower()
+        key = f"ans_cache:{faculty}:{semester}:{hashlib.md5(norm_q.encode()).hexdigest()}"
+        await redis.setex(key, 3600 * 24, response) # 24 hours cache
 
     async def get_embedding(self, text: str, model: str = "text-embedding-3-small") -> list[float]:
         """

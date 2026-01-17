@@ -13,6 +13,8 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[UUID] = None
     collection_name: str
+    faculty_id: Optional[str] = None
+    semester_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     message: str
@@ -28,9 +30,18 @@ async def chat(
     fastapi_req: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...)
+    x_user_id: str = Header(...),
+    x_faculty_id: Optional[str] = Header(None),
+    x_semester_id: Optional[str] = Header(None)
 ):
     request_id = getattr(fastapi_req.state, "request_id", None)
+
+    # Enforce Faculty + Semester context (from request or headers)
+    faculty_id = request.faculty_id or x_faculty_id
+    semester_id = request.semester_id or x_semester_id
+
+    if not faculty_id or not semester_id:
+        raise HTTPException(status_code=400, detail="Academic context (Faculty and Semester) is required and non-bypassable.")
 
     assistant_message, session_id, learning_summary, history_delta = await chat_service.handle_chat_message(
         db,
@@ -38,6 +49,8 @@ async def chat(
         session_id=request.session_id,
         user_message=request.message,
         collection_name=request.collection_name,
+        faculty_id=faculty_id,
+        semester_id=semester_id,
         request_id=request_id
     )
 
