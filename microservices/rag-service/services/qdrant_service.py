@@ -47,7 +47,7 @@ class QdrantService:
         )
         logger.info("Upsert operation completed.")
 
-    def search(self, vector: list[float], limit: int = 5) -> list[models.ScoredPoint]:
+    def search(self, vector: list[float], limit: int = 5, query_filter: models.Filter = None) -> list[models.ScoredPoint]:
         """
         Performs a similarity search for a given vector.
         """
@@ -56,6 +56,7 @@ class QdrantService:
             collection_name=self.collection_name,
             query_vector=vector,
             limit=limit,
+            query_filter=query_filter,
             with_payload=True  # Ensure the payload (the text) is returned
         )
         logger.info(f"Search found {len(search_result)} results.")

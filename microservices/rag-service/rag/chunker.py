@@ -1,12 +1,17 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> list[str]:
+# Production-grade fixed chunk sizes for academic material
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 50
+
+def chunk_text(text: str) -> list[str]:
     """
     Splits a long text into smaller chunks of a specified size.
+    Uses fixed production-grade parameters.
     """
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
         length_function=len,
     )
     return text_splitter.split_text(text)

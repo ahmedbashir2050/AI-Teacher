@@ -5,8 +5,14 @@ from uuid import UUID, uuid4
 def get_chat_session(db: Session, session_id: UUID):
     return db.query(ChatSession).filter(ChatSession.id == session_id).first()
 
-def create_chat_session(db: Session, user_id: str, collection_name: str = None):
-    session = ChatSession(id=uuid4(), user_id=user_id, collection_name=collection_name)
+def create_chat_session(db: Session, user_id: str, collection_name: str = None, faculty_id: str = None, semester_id: str = None):
+    session = ChatSession(
+        id=uuid4(),
+        user_id=user_id,
+        collection_name=collection_name,
+        faculty_id=faculty_id,
+        semester_id=semester_id
+    )
     db.add(session)
     db.commit()
     db.refresh(session)
