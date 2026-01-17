@@ -5,6 +5,8 @@ from ..db.base import BaseModel
 class ChatSession(BaseModel):
     __tablename__ = 'chat_sessions'
     user_id = Column(UUID(as_uuid=True), index=True, nullable=False)
+    collection_name = Column(String(255), index=True)
+    learning_summary = Column(Text) # Summarized user learning state
     title = Column(String(255))
 
 class ChatMessage(BaseModel):

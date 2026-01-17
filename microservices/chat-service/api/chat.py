@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from ..db.session import get_db
 from ..services import chat_service
@@ -26,12 +26,13 @@ def get_user_id_key(request: Request):
 async def chat(
     request: ChatRequest,
     fastapi_req: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     x_user_id: str = Header(...)
 ):
     request_id = getattr(fastapi_req.state, "request_id", None)
 
-    assistant_message, session_id = await chat_service.handle_chat_message(
+    assistant_message, session_id, learning_summary, history_delta = await chat_service.handle_chat_message(
         db,
         user_id=x_user_id,
         session_id=request.session_id,
@@ -39,4 +40,14 @@ async def chat(
         collection_name=request.collection_name,
         request_id=request_id
     )
+
+    # Offload summarization to background
+    background_tasks.add_task(
+        chat_service.update_learning_summary_task,
+        db,
+        session_id,
+        learning_summary,
+        history_delta
+    )
+
     return ChatResponse(message=assistant_message, session_id=session_id)
