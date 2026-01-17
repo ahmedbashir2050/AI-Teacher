@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  db-auth:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+
+  db-user:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5434:5432"
+
+  db-chat:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: chat_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5435:5432"
+
+  db-rag:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: rag_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5436:5432"
+
+  db-exam:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: exam_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5437:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_ISSUER: ${JWT_ISSUER}
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:8000
+      USER_SERVICE_URL: http://user-service:8000
+      CHAT_SERVICE_URL: http://chat-service:8000
+      RAG_SERVICE_URL: http://rag-service:8000
+      EXAM_SERVICE_URL: http://exam-service:8000
+    ports:
+      - "8080:8000"
+    depends_on:
+      - redis
+
+  auth-service:
+    build:
+      context: ./auth-service
+    environment:
+      DATABASE_URL: postgresql://user:password@db-auth:5432/auth_db
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_ISSUER: ${JWT_ISSUER}
+    depends_on:
+      - db-auth
+
+  user-service:
+    build:
+      context: ./user-service
+    environment:
+      DATABASE_URL: postgresql://user:password@db-user:5432/user_db
+    depends_on:
+      - db-user
+
+  chat-service:
+    build:
+      context: ./chat-service
+    environment:
+      DATABASE_URL: postgresql://user:password@db-chat:5432/chat_db
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      RAG_SERVICE_URL: http://rag-service:8000
+    depends_on:
+      - db-chat
+      - redis
+
+  rag-service:
+    build:
+      context: ./rag-service
+    environment:
+      DATABASE_URL: postgresql://user:password@db-rag:5432/rag_db
+      QDRANT_URL: http://qdrant:6333
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - db-rag
+      - qdrant
+
+  exam-service:
+    build:
+      context: ./exam-service
+    environment:
+      DATABASE_URL: postgresql://user:password@db-exam:5432/exam_db
+      RAG_SERVICE_URL: http://rag-service:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - db-exam
+
+  notification-service:
+    build:
+      context: ./notification-service
+
+networks:
+  default:
+    name: ai-teacher-network

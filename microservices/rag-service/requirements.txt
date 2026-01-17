@@ -1,0 +1,11 @@
+fastapi[all]
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+pydantic-settings
+qdrant-client
+openai
+pypdf
+langchain-text-splitters
+tiktoken
+langchain-openai

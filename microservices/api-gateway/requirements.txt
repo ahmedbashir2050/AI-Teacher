@@ -1,0 +1,8 @@
+fastapi[all]
+uvicorn[standard]
+httpx
+python-jose[cryptography]
+pydantic-settings
+fastapi-limiter
+redis
+aioredis
