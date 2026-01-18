@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
-from ..repository import exam_repository
+from repository import exam_repository
 from .llm_service import llm_service
 import json
 import httpx
-from ..core.config import settings
+from core.config import settings
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 

@@ -1,5 +1,5 @@
 from openai import AsyncOpenAI, APIError
-from ..core.config import settings
+from core.config import settings
 import logging
 import aioredis
 import json

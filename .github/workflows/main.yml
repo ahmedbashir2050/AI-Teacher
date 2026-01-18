@@ -7,26 +7,55 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-python-version: '3.11'
+          python-version: '3.11'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest httpx
+          pip install ruff pytest httpx alembic pydantic-settings sqlalchemy python-jose[cryptography] passlib[bcrypt] redis
+      - name: Lint with ruff
+        run: ruff check .
       - name: Run basic tests
         run: |
-          # Example: Run tests for a specific service or all
-          # pytest microservices/api-gateway/tests
           echo "Running basic tests..."
+          # pytest microservices/
+
+      - name: Check Alembic Migrations
+        run: |
+          export DATABASE_URL=sqlite:///test.db
+          export JWT_AUDIENCE=a
+          export JWT_ISSUER=i
+          export JWT_SECRET_KEY=s
+          export REDIS_URL=redis://localhost
+          export OPENAI_API_KEY=sk-test
+          for s in auth-service user-service chat-service exam-service; do
+            echo "Checking migrations for $s..."
+            cd microservices/$s
+            alembic check
+            cd ../..
+          done
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
 
   build-and-push:
-    needs: test
+    needs: [lint-and-test, security-scan]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     strategy:

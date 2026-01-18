@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
-from ..db.base import BaseModel
+from db.base import BaseModel
 
 class Faculty(BaseModel):
     __tablename__ = 'faculties'

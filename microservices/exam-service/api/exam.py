@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
-from ..db.session import get_db
-from ..repository import exam_repository
-from ..tasks import generate_exam_task
+from db.session import get_db
+from repository import exam_repository
+from tasks import generate_exam_task
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from uuid import UUID

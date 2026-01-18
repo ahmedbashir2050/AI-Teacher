@@ -1,5 +1,5 @@
 from .embeddings import generate_embedding
-from ..services.qdrant_service import qdrant_service
+from services.qdrant_service import qdrant_service
 
 async def retrieve_relevant_chunks(query: str, top_k: int = 5) -> list[str]:
     """

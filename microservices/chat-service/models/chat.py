@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-from ..db.base import BaseModel
+from db.base import BaseModel
 
 class ChatSession(BaseModel):
     __tablename__ = 'chat_sessions'

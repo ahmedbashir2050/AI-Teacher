@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient, models
-from ..core.config import settings
+from core.config import settings
 import logging
 
 # Configure logging

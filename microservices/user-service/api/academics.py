@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..db.session import get_db
-from ..repository import academic_repository
+from db.session import get_db
+from repository import academic_repository
 from pydantic import BaseModel
 from typing import List
 

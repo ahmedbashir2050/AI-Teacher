@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, ForeignKey, Text, Integer, JSON
 from sqlalchemy.dialects.postgresql import UUID
-from ..db.base import BaseModel
+from db.base import BaseModel
 
 class Exam(BaseModel):
     __tablename__ = 'exams'

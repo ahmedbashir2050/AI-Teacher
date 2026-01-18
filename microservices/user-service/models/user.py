@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from ..db.base import BaseModel
+from db.base import BaseModel
 
 class UserProfile(BaseModel):
     __tablename__ = 'user_profiles'

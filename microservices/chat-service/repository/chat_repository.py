@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
-from ..models.chat import ChatSession, ChatMessage
+from models.chat import ChatSession, ChatMessage
 from uuid import UUID, uuid4
+from datetime import datetime
 
 def get_chat_session(db: Session, session_id: UUID):
-    return db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    return db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.deleted_at == None).first()
 
 def create_chat_session(db: Session, user_id: str, collection_name: str = None, faculty_id: str = None, semester_id: str = None):
     session = ChatSession(
@@ -43,3 +44,11 @@ def create_chat_message(db: Session, session_id: UUID, role: str, content: str):
     db.commit()
     db.refresh(message)
     return message
+
+def soft_delete_session(db: Session, session_id: UUID, user_id: str):
+    session = db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == user_id).first()
+    if session:
+        session.deleted_at = datetime.utcnow()
+        db.commit()
+        return True
+    return False

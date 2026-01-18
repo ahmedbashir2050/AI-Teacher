@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Session
-from ..repository import chat_repository
-from ..rag.prompt import create_teacher_prompt
+from repository import chat_repository
+from rag.prompt import create_teacher_prompt
 from .llm_service import llm_service
 from uuid import UUID
 import httpx
-from ..core.config import settings
+from core.config import settings
 import logging
 from tenacity import retry, stop_after_attempt, wait_exponential
 
