@@ -48,7 +48,7 @@ def ingest_document_task(self, collection_name: str, faculty_id: str, semester_i
             user_id="system",
             action="ingest_complete",
             resource="document",
-            details={
+            metadata={
                 "collection_name": collection_name,
                 "filename": filename,
                 "chunks": num_chunks

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from app.models.responses import MessageResponse
 from app.core.security import ADMIN_ACCESS
 from app.core.limiter import limiter

@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.responses import MessageResponse
 from app.core.security import ADMIN_ACCESS
-from app.config import settings
-from datetime import datetime, timedelta
 from app.repository import user_repository
 from app.db.session import get_db
 from sqlalchemy.orm import Session
+from app.core.audit import log_audit
 
 router = APIRouter()
 
@@ -37,5 +36,13 @@ async def deactivate_user(user_id: int, db: Session = Depends(get_db), current_u
 
     user.disabled = True
     db.commit()
+
+    log_audit(
+        user_id=str(current_user.get("sub", "admin")),
+        action="deactivate",
+        resource="user",
+        resource_id=str(user_id),
+        metadata={"username": user.username}
+    )
 
     return {"message": f"User '{user.username}' has been deactivated."}

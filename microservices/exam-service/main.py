@@ -23,7 +23,7 @@ async def security_and_correlation_middleware(request: Request, call_next):
 
     if request.url.path not in ["/health", "/docs", "/openapi.json"]:
         if not request.headers.get("X-User-Id"):
-            logger.warning(f"Untrusted request to exam-service: Missing X-User-Id", extra={"request_id": request_id})
+            logger.warning("Untrusted request to exam-service: Missing X-User-Id", extra={"request_id": request_id})
 
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id

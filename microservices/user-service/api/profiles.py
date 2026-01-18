@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.orm import Session
 from db.session import get_db
 from pydantic import BaseModel
@@ -42,5 +42,5 @@ def update_my_profile(request: Request, profile_in: ProfileUpdate, db: Session =
 
     db.commit()
     db.refresh(profile)
-    log_audit(x_user_id, "update", "profile", resource_id=str(profile.id), request_id=request_id)
+    log_audit(x_user_id, "update", "profile", resource_id=str(profile.id), metadata={"full_name": profile.full_name}, request_id=request_id)
     return profile

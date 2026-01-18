@@ -1,6 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Boolean, ForeignKey, Enum
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, Boolean, Enum
 from db.base import BaseModel
 
 class RoleEnum(str, enum.Enum):

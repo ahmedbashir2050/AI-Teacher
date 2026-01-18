@@ -4,10 +4,8 @@ from app.rag.retriever import retrieve_relevant_chunks
 from app.rag.prompt import create_teacher_prompt
 from app.services.llm_service import llm_service
 from app.models.user import User
-from app.models.academics import Book
 from uuid import UUID
 from app.repository import book_repository
-from app.repository import chat_repository
 
 def handle_chat_message(db: Session, user: User, session_id: UUID | None, user_message: str, book_id: int) -> tuple[str, UUID]:
     book = book_repository.get_book_by_id(db, book_id=book_id)

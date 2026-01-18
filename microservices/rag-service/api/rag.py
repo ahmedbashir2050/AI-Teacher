@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from services.qdrant_service import QdrantService
 from rag.embeddings import generate_embedding
 from tasks import ingest_document_task
 from core.cache import cache_result
 from core.audit import log_audit
 from qdrant_client import models
-import uuid
 from pydantic import BaseModel
-from typing import List, Optional
 
 router = APIRouter()
 
@@ -43,7 +41,7 @@ async def _do_search(request: SearchRequest):
         )
         search_results = qs.search(vector=query_vector, limit=request.top_k, query_filter=query_filter)
         return [{"text": point.payload["text"], "score": point.score} for point in search_results]
-    except Exception as e:
+    except Exception:
         return []
 
 @router.post("/ingest")
@@ -66,7 +64,7 @@ async def ingest_document(collection_name: str, faculty_id: str, semester_id: st
         user_id="system",  # Ingestion might be done by an admin or system process
         action="ingest_request",
         resource="document",
-        details={
+        metadata={
             "collection_name": collection_name,
             "faculty_id": faculty_id,
             "semester_id": semester_id,
