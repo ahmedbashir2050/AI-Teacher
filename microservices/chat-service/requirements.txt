@@ -8,3 +8,4 @@ redis
 aioredis
 httpx
 fastapi-limiter
+prometheus-fastapi-instrumentator

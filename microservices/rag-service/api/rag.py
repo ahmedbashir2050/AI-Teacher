@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from ..services.qdrant_service import QdrantService
-from ..rag.loader import load_pdf
-from ..rag.chunker import chunk_text
 from ..rag.embeddings import generate_embedding
+from ..tasks import ingest_document_task
+from ..core.cache import cache_result
 from qdrant_client import models
 import uuid
-import io
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -23,7 +22,14 @@ class SearchResult(BaseModel):
     score: float
 
 @router.post("/search")
+@cache_result(ttl=600)
 async def search(request: SearchRequest):
+    # We need to convert request to something JSON serializable for cache key
+    # But cache_result handles args/kwargs. Since request is a Pydantic model,
+    # it might need conversion.
+    return await _do_search(request)
+
+async def _do_search(request: SearchRequest):
     qs = QdrantService(collection_name=request.collection_name)
     query_vector = await generate_embedding(request.query)
     try:
@@ -45,32 +51,18 @@ async def ingest_document(collection_name: str, faculty_id: str, semester_id: st
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     file_content = await file.read()
-    text = load_pdf(io.BytesIO(file_content))
-    chunks = chunk_text(text)
 
-    if not chunks:
-        return {"message": "No text extracted from PDF"}
+    # Trigger async task
+    task = ingest_document_task.delay(
+        collection_name,
+        faculty_id,
+        semester_id,
+        file_content,
+        file.filename
+    )
 
-    qs = QdrantService(collection_name=collection_name)
-    points = []
-
-    # Process chunks in series for simplicity, but await each embedding
-    for chunk in chunks:
-        vector = await generate_embedding(chunk)
-        points.append(models.PointStruct(
-            id=str(uuid.uuid4()),
-            vector=vector,
-            payload={
-                "text": chunk,
-                "source": file.filename,
-                "faculty_id": faculty_id,
-                "semester_id": semester_id
-            }
-        ))
-
-    # Create collection using the first vector size
-    if points:
-        qs.create_collection_if_not_exists(vector_size=len(points[0].vector))
-        qs.upsert_points(points)
-
-    return {"message": f"Successfully ingested {len(chunks)} chunks into {collection_name}"}
+    return {
+        "message": "Ingestion started",
+        "task_id": task.id,
+        "filename": file.filename
+    }

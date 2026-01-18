@@ -9,3 +9,6 @@ pypdf
 langchain-text-splitters
 tiktoken
 langchain-openai
+celery[redis]
+prometheus-fastapi-instrumentator
+aioredis

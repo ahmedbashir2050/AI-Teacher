@@ -3,10 +3,11 @@ import logging
 import aioredis
 from fastapi import FastAPI, Request, Response
 from fastapi_limiter import FastAPILimiter
-from .api.chat import router as chat_router
-from .db.base import Base
-from .db.session import engine
-from .core.config import settings
+from prometheus_fastapi_instrumentator import Instrumentator
+from api.chat import router as chat_router
+from db.base import Base
+from db.session import engine
+from core.config import settings
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,7 @@ async def startup():
     try:
         redis = await aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
         await FastAPILimiter.init(redis)
+        Instrumentator().instrument(app).expose(app)
     except Exception as e:
         logger.error(f"Failed to initialize Redis for rate limiting: {e}")
         # Graceful degradation: Limiter will be disabled if init fails

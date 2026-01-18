@@ -1,9 +1,10 @@
 import uuid
 import logging
 from fastapi import FastAPI, Request, Response
-from .api.auth import router as auth_router
-from .db.base import Base
-from .db.session import engine
+from prometheus_fastapi_instrumentator import Instrumentator
+from api.auth import router as auth_router
+from db.base import Base
+from db.session import engine
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Auth Service", version="1.0.0")
+Instrumentator().instrument(app).expose(app)
 
 @app.middleware("http")
 async def add_correlation_id(request: Request, call_next):

@@ -2,10 +2,11 @@ import httpx
 import uuid
 from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from jose import jwt, JWTError
-from .core.config import settings
+from core.config import settings
 import aioredis
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
+from prometheus_fastapi_instrumentator import Instrumentator
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +18,7 @@ app = FastAPI(title="API Gateway", version="1.0.0")
 async def startup():
     redis = await aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
     await FastAPILimiter.init(redis)
+    Instrumentator().instrument(app).expose(app)
 
 async def reverse_proxy(request: Request, url: str, user_data: dict = None):
     # Correlation ID
