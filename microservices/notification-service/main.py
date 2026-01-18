@@ -1,7 +1,16 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI
 from pydantic import BaseModel
+from tasks import send_notification_task
+from prometheus_fastapi_instrumentator import Instrumentator
+from core.observability import setup_logging, setup_tracing, instrument_app
+
+# Setup observability
+logger = setup_logging("notification-service")
+setup_tracing("notification-service")
 
 app = FastAPI(title="Notification Service", version="1.0.0")
+Instrumentator().instrument(app).expose(app)
+instrument_app(app, "notification-service")
 
 class Notification(BaseModel):
     user_id: str
@@ -9,9 +18,12 @@ class Notification(BaseModel):
     type: str # 'email', 'fcm', etc.
 
 @app.post("/notify")
-async def send_notification(notification: Notification, background_tasks: BackgroundTasks):
-    # Logic to send notification
-    background_tasks.add_task(print, f"Sending {notification.type} to {notification.user_id}: {notification.message}")
+async def send_notification(notification: Notification):
+    send_notification_task.delay(
+        notification.user_id,
+        notification.message,
+        notification.type
+    )
     return {"status": "queued"}
 
 @app.get("/health")

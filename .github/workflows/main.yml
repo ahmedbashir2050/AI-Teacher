@@ -1,0 +1,56 @@
+name: AI Teacher Backend CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest httpx
+      - name: Run basic tests
+        run: |
+          # Example: Run tests for a specific service or all
+          # pytest microservices/api-gateway/tests
+          echo "Running basic tests..."
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        service: [api-gateway, auth-service, user-service, chat-service, rag-service, exam-service, notification-service]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-docker-buildx@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ./microservices/${{ matrix.service }}
+          push: true
+          tags: |
+            my-docker-org/ai-teacher-${{ matrix.service }}:latest
+            my-docker-org/ai-teacher-${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

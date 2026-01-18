@@ -1,19 +1,20 @@
 import uuid
-import logging
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from api.rag import router as rag_router
 from db.base import Base
 from db.session import engine
+from core.observability import setup_logging, setup_tracing, instrument_app
 
-# Configure Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Setup observability
+logger = setup_logging("rag-service")
+setup_tracing("rag-service")
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="RAG Service", version="1.0.0")
 Instrumentator().instrument(app).expose(app)
+instrument_app(app, "rag-service")
 
 @app.middleware("http")
 async def security_and_correlation_middleware(request: Request, call_next):
