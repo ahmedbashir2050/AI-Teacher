@@ -60,7 +60,7 @@ async def chat(
     if not faculty_id or not semester_id:
         raise HTTPException(status_code=400, detail="Academic context (Faculty and Semester) is required and non-bypassable.")
 
-    assistant_message, session_id, learning_summary, history_delta = await chat_service.handle_chat_message(
+    assistant_message, session_id, learning_summary, history_delta, metadata = await chat_service.handle_chat_message(
         db,
         user_id=x_user_id,
         session_id=request.session_id,
@@ -80,5 +80,12 @@ async def chat(
         history_delta
     )
 
-    log_audit(x_user_id, "message", "chat_session", resource_id=str(session_id), request_id=request_id)
+    log_audit(
+        x_user_id,
+        "message",
+        "chat_session",
+        resource_id=str(session_id),
+        details=metadata,
+        request_id=request_id
+    )
     return ChatResponse(message=assistant_message, session_id=session_id)

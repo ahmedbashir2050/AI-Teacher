@@ -55,68 +55,54 @@ For detailed architecture information, see [microservices/MICROSERVICES.md](micr
     ```
     The production gateway will be available at `http://localhost:80`.
 
-## 📚 API Usage
+## 📚 API Usage (via Gateway)
 
-You can interact with the API through its documentation at `http://localhost:8000/docs` or by sending requests directly.
+The entry point for all API calls is the NGINX Edge Gateway at `http://localhost:80`. All academic endpoints require a valid JWT in the `Authorization` header.
 
-### 1. Ingest a Document
-First, you must upload a curriculum PDF to populate the vector database.
+### 1. Ingest a Document (Admin/Academic)
+Upload a curriculum PDF to populate the vector database.
 
-*   **Endpoint:** `POST /api/ingest`
+*   **Endpoint:** `POST /api/rag/ingest?collection_name=math&faculty_id=F1&semester_id=S1`
 *   **Body:** `multipart/form-data` with a PDF file.
 
-**Example (`curl`):**
-```bash
-curl -X POST "http://localhost:8000/api/ingest" \
-     -H "Content-Type: multipart/form-data" \
-     -F "file=@/path/to/your/sample_book.pdf"
-```
-
 ### 2. Chat with the AI Teacher
-Ask a question based on the ingested curriculum.
+Ask a question based on the curriculum. Requires academic context.
 
-*   **Endpoint:** `POST /api/chat`
+*   **Endpoint:** `POST /api/chat/chat`
 *   **Body (JSON):**
     ```json
     {
-      "question": "What is the core concept of chapter one?"
+      "message": "Explain the concept of derivatives.",
+      "collection_name": "math",
+      "faculty_id": "F1",
+      "semester_id": "S1"
     }
     ```
 
-### 3. Summarize a Chapter
-Get a summary of a specific topic.
+### 3. Generate an Exam
+Create a university-style exam with MCQ and Theory questions.
 
-*   **Endpoint:** `POST /api/summarize`
+*   **Endpoint:** `POST /api/exams/generate`
 *   **Body (JSON):**
     ```json
     {
-      "chapter": "Introduction to Microeconomics",
-      "style": "bullet"
-    }
-    ```
-    *   `style` can be `simple`, `exam`, or `bullet`.
-
-### 4. Generate Flashcards
-Create question-answer flashcards for studying.
-
-*   **Endpoint:** `POST /api/flashcards`
-*   **Body (JSON):**
-    ```json
-    {
-      "chapter": "The Laws of Thermodynamics",
-      "count": 5
+      "course_id": "MATH101",
+      "collection_name": "math",
+      "mcq_count": 5,
+      "theory_count": 2
     }
     ```
 
-### 5. Generate an Exam
-Create a university-style exam.
+### 4. User Profiles
+Update your academic context to get personalized tutoring.
 
-*   **Endpoint:** `POST /api/exam`
+*   **Endpoint:** `PUT /api/users/me`
 *   **Body (JSON):**
     ```json
     {
-      "chapter": "Cellular Biology",
-      "mcq": 5,
-      "theory": 2
+      "full_name": "Sudanese Student",
+      "faculty_id": "F1",
+      "department_id": "D1",
+      "semester_id": "S1"
     }
     ```

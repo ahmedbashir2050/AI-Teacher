@@ -3,6 +3,7 @@ from services.qdrant_service import QdrantService
 from rag.embeddings import generate_embedding
 from tasks import ingest_document_task
 from core.cache import cache_result
+from core.audit import log_audit
 from qdrant_client import models
 import uuid
 from pydantic import BaseModel
@@ -59,6 +60,19 @@ async def ingest_document(collection_name: str, faculty_id: str, semester_id: st
         semester_id,
         file_content,
         file.filename
+    )
+
+    log_audit(
+        user_id="system",  # Ingestion might be done by an admin or system process
+        action="ingest_request",
+        resource="document",
+        details={
+            "collection_name": collection_name,
+            "faculty_id": faculty_id,
+            "semester_id": semester_id,
+            "filename": file.filename,
+            "task_id": task.id
+        }
     )
 
     return {

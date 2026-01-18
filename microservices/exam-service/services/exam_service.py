@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from repository import exam_repository
-from .llm_service import llm_service
+from services.llm_service import llm_service
+from core.audit import log_audit
 import json
 import httpx
 from core.config import settings
@@ -70,5 +71,18 @@ async def generate_and_store_exam(db: Session, user_id: str, course_id: str, col
             q.get("options"),
             q["correct_answer"],
         )
+
+    log_audit(
+        user_id=user_id,
+        action="generate_complete",
+        resource="exam",
+        resource_id=str(db_exam.id),
+        details={
+            "course_id": course_id,
+            "mcq_count": mcq_count,
+            "theory_count": theory_count
+        },
+        request_id=request_id
+    )
 
     return db_exam
