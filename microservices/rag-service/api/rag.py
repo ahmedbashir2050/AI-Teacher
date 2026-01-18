@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from ..services.qdrant_service import QdrantService
-from ..rag.embeddings import generate_embedding
-from ..tasks import ingest_document_task
-from ..core.cache import cache_result
+from services.qdrant_service import QdrantService
+from rag.embeddings import generate_embedding
+from tasks import ingest_document_task
+from core.cache import cache_result
 from qdrant_client import models
 import uuid
 from pydantic import BaseModel

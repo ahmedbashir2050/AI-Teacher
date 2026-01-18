@@ -1,7 +1,7 @@
 import enum
 from sqlalchemy import Column, String, Boolean, ForeignKey, Enum
 from sqlalchemy.orm import relationship
-from ..db.base import BaseModel
+from db.base import BaseModel
 
 class RoleEnum(str, enum.Enum):
     ADMIN = "admin"

@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, BackgroundTasks, status
 from sqlalchemy.orm import Session
-from ..db.session import get_db
-from ..services import chat_service
+from db.session import get_db
+from services import chat_service
 from pydantic import BaseModel
 from uuid import UUID
 from typing import Optional
 from fastapi_limiter.depends import RateLimiter
+from core.audit import log_audit
 
 router = APIRouter()
 
@@ -23,6 +24,22 @@ class ChatResponse(BaseModel):
 def get_user_id_key(request: Request):
     # Use X-User-Id for rate limiting
     return request.headers.get("X-User-Id", request.client.host)
+
+@router.delete("/session/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(
+    session_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...)
+):
+    from repository import chat_repository
+    request_id = getattr(request.state, "request_id", None)
+    success = chat_repository.soft_delete_session(db, session_id, x_user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found or unauthorized")
+
+    log_audit(x_user_id, "delete", "chat_session", resource_id=str(session_id), request_id=request_id)
+    return None
 
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(RateLimiter(times=20, minutes=1, identifier=get_user_id_key))])
 async def chat(
@@ -63,4 +80,5 @@ async def chat(
         history_delta
     )
 
+    log_audit(x_user_id, "message", "chat_session", resource_id=str(session_id), request_id=request_id)
     return ChatResponse(message=assistant_message, session_id=session_id)

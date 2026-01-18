@@ -1,6 +1,6 @@
 import json
 import aioredis
-from ..core.config import settings
+from core.config import settings
 import functools
 from pydantic import BaseModel
 

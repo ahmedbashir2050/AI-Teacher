@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from ..models.exam import Exam, Question, ExamAttempt
+from models.exam import Exam, Question, ExamAttempt
 from uuid import UUID, uuid4
 
 def create_exam(db: Session, title: str, course_id: str, creator_id: str):

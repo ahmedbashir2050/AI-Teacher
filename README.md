@@ -20,7 +20,16 @@ This architecture ensures accuracy and prevents the model from using its general
 
 ## 🐳 Setup and Installation
 
-This project is fully containerized using Docker, making setup straightforward.
+This project is a production-grade microservices mesh designed for high availability and scalability.
+
+### Architecture Highlights
+- **Microservices Mesh**: 7 specialized services (Auth, User, Chat, RAG, Exam, Notification, Gateway).
+- **Production Infrastructure**: NGINX Edge, PgBouncer pooling, Redis caching, Qdrant vector database.
+- **Observability**: Full OpenTelemetry, Prometheus, and Grafana integration.
+- **Security**: Hardened NGINX, JWT with revocation, RBAC, and structured Audit Logging.
+- **CI/CD**: Automated multi-stage GitHub Actions pipeline with security scanning.
+
+For detailed architecture information, see [microservices/MICROSERVICES.md](microservices/MICROSERVICES.md).
 
 ### Prerequisites
 *   Docker and Docker Compose installed.
@@ -41,9 +50,10 @@ This project is fully containerized using Docker, making setup straightforward.
 
 3.  **Run the application:**
     ```bash
+    cd microservices
     docker-compose up --build
     ```
-    This command will build the FastAPI container, pull the Qdrant image, and start both services. The API will be available at `http://localhost:8000`.
+    The production gateway will be available at `http://localhost:80`.
 
 ## 📚 API Usage
 

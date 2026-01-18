@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from ..models.academics import Faculty, Department, Semester, Course, Book
+from models.academics import Faculty, Department, Semester, Course, Book
 
 def get_faculties(db: Session):
     return db.query(Faculty).all()
