@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from repository import exam_repository
 from tasks import generate_exam_task
+from core.audit import log_audit
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from uuid import UUID
@@ -39,6 +40,18 @@ async def generate_exam(
         request.mcq_count,
         request.theory_count,
         request_id
+    )
+
+    log_audit(
+        user_id=x_user_id,
+        action="generate_request",
+        resource="exam",
+        details={
+            "course_id": request.course_id,
+            "collection_name": request.collection_name,
+            "task_id": task.id
+        },
+        request_id=request_id
     )
 
     return ExamResponse(

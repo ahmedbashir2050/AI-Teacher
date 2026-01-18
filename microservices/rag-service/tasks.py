@@ -1,8 +1,9 @@
-from .core.celery_app import celery_app
-from .rag.loader import load_pdf
-from .rag.chunker import chunk_text
-from .rag.embeddings import generate_embedding
-from .services.qdrant_service import QdrantService
+from core.celery_app import celery_app
+from rag.loader import load_pdf
+from rag.chunker import chunk_text
+from rag.embeddings import generate_embedding
+from services.qdrant_service import QdrantService
+from core.audit import log_audit
 from qdrant_client import models
 import uuid
 import io
@@ -42,6 +43,18 @@ def ingest_document_task(self, collection_name: str, faculty_id: str, semester_i
             return len(chunks)
 
         num_chunks = asyncio.run(process_chunks())
+
+        log_audit(
+            user_id="system",
+            action="ingest_complete",
+            resource="document",
+            details={
+                "collection_name": collection_name,
+                "filename": filename,
+                "chunks": num_chunks
+            }
+        )
+
         return {"message": f"Successfully ingested {num_chunks} chunks", "filename": filename}
     except Exception as exc:
         logger.error(f"Error in ingest_document_task: {exc}")

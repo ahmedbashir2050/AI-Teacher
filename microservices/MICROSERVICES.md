@@ -1,58 +1,119 @@
 # AI-Teacher Production Microservices Architecture
 
 ## 🏗️ Architecture Overview
-The system is a production-grade, highly available microservices mesh designed to serve 100k+ concurrent users.
 
-### Core Services:
-- **NGINX (Edge Gateway)**: Single public entry point. Handles SSL termination, IP-based rate limiting, security headers, and response caching.
-- **API Gateway**: FastAPI-based (v1). Performs JWT validation, Redis-based token blacklist check, RBAC enforcement, per-user rate limiting, and request routing with identity injection (`X-User-Id`, `X-User-Role`).
-- **Auth Service**: Manages users, JWT issuance (Access/Refresh), and session revocation.
-- **User Service**: Manages academic hierarchy (Faculty, Department, Semester, Course, Book) and user profiles.
-- **Chat Service (AI Tutor)**: Core AI logic, multi-stage RAG pipeline orchestration, and pedagogical structured responses. Supports soft-delete for sessions.
-- **RAG Service**: PDF ingestion, chunking, embedding generation, and vector retrieval via Qdrant.
-- **Exam Service**: Automated exam generation and student attempt tracking.
-- **Notification Service**: Async delivery of system events via Celery/Redis.
+```mermaid
+graph TD
+    User((User)) --> Nginx[NGINX Edge]
+    Nginx --> Gateway[API Gateway]
+    Gateway --> Redis[(Redis Cache/Limiter)]
+
+    Gateway --> Auth[Auth Service]
+    Gateway --> UserSvc[User Service]
+    Gateway --> Chat[Chat Service]
+    Gateway --> RAG[RAG Service]
+    Gateway --> Exam[Exam Service]
+
+    Chat --> RAG
+    Exam --> RAG
+
+    Auth --> AuthDB[(Auth DB)]
+    UserSvc --> UserDB[(User DB)]
+    Chat --> ChatDB[(Chat DB)]
+    Exam --> ExamDB[(Exam DB)]
+
+    Chat -.-> Celery[Celery Workers]
+    RAG -.-> Celery
+    Exam -.-> Celery
+
+    Celery --> Redis
+    Celery --> Notification[Notification Service]
+
+    RAG --> Qdrant[(Qdrant Vector DB)]
+```
+
+## 🛠️ Service Responsibilities & Endpoints
+
+### 1. Auth Service
+- **Purpose**: Identity and Access Management.
+- **Endpoints**:
+  - `POST /auth/register`: Create new student/academic accounts.
+  - `POST /auth/login`: Issue JWT access and refresh tokens.
+  - `POST /auth/logout`: Revoke sessions via Redis blacklist.
+  - `POST /auth/refresh`: Renew expired access tokens.
+- **Database**: PostgreSQL (`auth_db`).
+
+### 2. User Service
+- **Purpose**: Academic hierarchy and user profiles.
+- **Endpoints**:
+  - `GET /faculties`: List available faculties.
+  - `GET /me`: Retrieve current user profile.
+  - `PUT /me`: Update profile (Faculty, Department, Semester).
+- **Database**: PostgreSQL (`user_db`).
+
+### 3. Chat Service (AI Tutor)
+- **Purpose**: Orchestrate AI tutoring sessions using RAG and pedagogical guardrails.
+- **Endpoints**:
+  - `POST /chat`: Submit a message and get an AI response.
+  - `DELETE /session/{id}`: Soft-delete a chat session.
+- **Database**: PostgreSQL (`chat_db`).
+- **Background Jobs**: Async learning state summarization to optimize LLM context.
+
+### 4. RAG Service
+- **Purpose**: Document ingestion, chunking, and semantic search.
+- **Endpoints**:
+  - `POST /search`: Vector search across curriculum content with Faculty/Semester isolation.
+  - `POST /ingest`: Upload PDF for chunking and embedding.
+- **Databases**: Qdrant (Vectors), PostgreSQL (Metadata/Alembic).
+- **Background Jobs**: Async PDF processing and embedding generation via Celery.
+
+### 5. Exam Service
+- **Purpose**: Automated exam generation from course material.
+- **Endpoints**:
+  - `POST /generate`: Trigger async exam generation (MCQ & Theory).
+  - `GET /{id}`: Retrieve generated exam questions.
+- **Database**: PostgreSQL (`exam_db`).
+- **Background Jobs**: Async LLM-based exam creation via Celery.
+
+### 6. Notification Service
+- **Purpose**: Async delivery of system events.
+- **Database**: None (Stateless).
+- **Jobs**: Send Email/FCM notifications via Celery.
 
 ## 🚦 Scale & Performance Strategy
-- **Horizontal Scaling**: Core services (`chat`, `rag`, `exam`) run with 3-5+ replicas. NGINX acts as the primary load balancer.
-- **Database Hardening**:
-  - **PgBouncer**: Integrated for transaction pooling (supports 10k+ connections) on port 6432.
-  - **Read Replicas**: All services support `READ_DATABASE_URL` and `ReadSessionLocal` to offload read traffic.
-  - **Migrations**: Automated database migrations via Alembic integrated into the CI/CD pipeline and container entrypoints.
-- **Standardized Caching**: Robust Redis caching layer in `core/cache.py` with MD5 key hashing and Pydantic model serialization.
-- **Async Mesh**: Offloads heavy tasks (PDF processing, Exam generation, Notifications) to Celery/Redis workers.
-- **Vector Isolation**: Qdrant collections use physical sharding (4 shards) and replication (2x). Data is logically partitioned by `faculty_id` and `semester_id`.
+
+### Horizontal Scaling
+- **Target**: 100k+ concurrent users.
+- **Replication**: All services are stateless and run with 3-10+ replicas behind NGINX.
+- **Load Balancing**: NGINX uses round-robin for internal service mesh.
+
+### Database Hardening
+- **PgBouncer**: All relational services connect via PgBouncer (port 6432) for transaction pooling, supporting 10k+ active database connections.
+- **Read Replicas**: Services use `ReadSessionLocal` to route `GET` requests to PostgreSQL read replicas, offloading the primary write node.
+- **Migrations**: Alembic migrations are executed on startup via `entrypoint.sh` and verified in CI. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md).
+
+### Standardized Caching
+- **Redis Strategy**:
+  - **Auth**: Token blacklist (TTL = token expiry).
+  - **RAG**: Vector search results (TTL = 10m).
+  - **LLM**: Final AI responses (TTL = 6h-24h depending on content).
+  - **Rate Limiting**: Per-user sliding window limits.
+
+### Async Pipeline
+- Heavy operations (PDF ingestion, Exam generation) are offloaded to **Celery** workers using **Redis** as a broker. This prevents blocking the main API threads.
 
 ## 🔐 Security & Governance
-- **Trust Boundary**: Gateway validates JWT and checks revocation status. Downstream services trust injected headers but enforce academic context.
-- **RBAC**: Role-Based Access Control (`admin`, `academic`, `student`) enforced at the edge.
-- **Audit Logging**: Structured JSON audit logs for all security and business events across all services.
-- **Data Isolation**: Strict isolation in vector search and relational queries using academic context filters.
-- **Hallucination Guardrails**: Multi-stage groundedness checks in the RAG pipeline to ensure AI responses are based strictly on curriculum context.
-- **Hardened Nginx**: CSP headers, XSS protection, HSTS, and frame-ancestors enforced.
+- **API Gateway**: Enforces JWT validation, RBAC (`admin`, `academic`, `student`), and per-user rate limiting.
+- **Audit Logging**: All critical events (Auth, Exams, RAG Ingestion, AI Queries) are logged in structured JSON for compliance.
+- **Academic Context**: Services enforce `faculty_id` and `semester_id` filters to prevent cross-tenant data leakage.
 
-## 📈 Observability & Monitoring
-- **Distributed Tracing**: OpenTelemetry integrated across all services for request tracing.
-- **Structured Logging**: All services use JSON logging with `X-Request-ID` correlation.
-- **Prometheus/Grafana**: Full stack monitoring with DNS-based service discovery for scaled replicas.
-- **Health Checks**: Standard `/health` and `/metrics` endpoints for orchestration and monitoring.
+## 🛠️ CI/CD Workflow
+1.  **Lint & Test**: Code quality checks with Ruff and unit testing.
+2.  **Migration Verification**: Runs `alembic upgrade head` and `alembic downgrade base` in a test environment to ensure migration integrity.
+3.  **Security Scan**: Dependency and Docker image vulnerability scanning with Trivy.
+4.  **Build & Push**: Builds multi-arch Docker images and pushes to registry.
 
-## 🛠️ CI/CD & DevOps
-- **GitHub Actions**: Multi-stage pipeline:
-  1. **Lint & Test**: Code quality checks with Ruff and unit testing.
-  2. **Migration Check**: Ensures Alembic migrations are in sync with models.
-  3. **Security Scan**: Vulnerability scanning with Trivy.
-  4. **Build & Push**: Build versioned Docker images.
-- **Docker Hardening**: All service containers run as non-root users (`appuser`) with an automated `entrypoint.sh` for database migrations.
-
-## 🚀 Deployment Instructions
-1.  **Configure Environment**: Copy `.env.example` to `.env` and fill in secrets (JWT, OpenAI, Redis, DB).
-2.  **Infrastructure**: Ensure Redis, PostgreSQL (via PgBouncer), and Qdrant are reachable.
-3.  **Start Services**: `docker-compose up -d --scale chat-service=5 --scale rag-service=5`
-4.  **Access**: Entry point is `http://localhost:80`.
-
-## 📜 Scaling Assumptions
-- **User Load**: Optimized for 100k+ concurrent users via Nginx load balancing and service replication.
-- **LLM Latency**: Mitigated via 6h-24h Redis caching of embeddings and common answers.
-- **Fault Tolerance**: Retries with exponential backoff implemented in Gateway proxy logic.
-- **DB Concurrency**: Managed by PgBouncer and Read Replicas.
+## 🚀 Deployment Notes
+- All services run as non-root users (`appuser`).
+- Use `docker-compose.yml` in the `microservices/` directory for local or production-like orchestration.
+- Ensure all environment variables in `.env` are set correctly, especially `JWT_SECRET_KEY` and `OPENAI_API_KEY`.

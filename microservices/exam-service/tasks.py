@@ -1,6 +1,6 @@
-from .core.celery_app import celery_app
-from .services.exam_service import generate_and_store_exam
-from .db.session import SessionLocal
+from core.celery_app import celery_app
+from services.exam_service import generate_and_store_exam
+from db.session import SessionLocal
 import logging
 
 logger = logging.getLogger(__name__)

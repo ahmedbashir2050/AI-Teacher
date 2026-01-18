@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from repository import chat_repository
 from rag.prompt import create_teacher_prompt
-from .llm_service import llm_service
+from services.llm_service import llm_service
 from uuid import UUID
 import httpx
 from core.config import settings
@@ -132,7 +132,16 @@ async def handle_chat_message(
     # We summarize if history is getting long
     history_delta = f"user: {user_message}\nassistant: {assistant_message}"
 
-    return assistant_message, chat_session.id, learning_summary, history_delta
+    metadata = {
+        "intent": intent,
+        "mode": mode,
+        "rag_score": max_score,
+        "cache_used": cache_used,
+        "relevant_chunks_count": len(relevant_chunks),
+        "quality_flag": quality_flag
+    }
+
+    return assistant_message, chat_session.id, learning_summary, history_delta, metadata
 
 async def update_learning_summary_task(db: Session, session_id: UUID, current_summary: str, history_delta: str):
     """

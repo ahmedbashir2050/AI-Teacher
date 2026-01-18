@@ -108,7 +108,8 @@ async def logout(request: Request, token: str = Depends(oauth2_scheme), r: redis
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.post("/refresh", response_model=Token)
-def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+def refresh_token(request: Request, refresh_token: str, db: Session = Depends(get_db)):
+    request_id = getattr(request.state, "request_id", None)
     try:
         payload = jwt.decode(
             refresh_token,
@@ -127,6 +128,8 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
 
         access_token = create_access_token(data={"sub": str(user.id), "role": user.role.value})
         new_refresh_token = create_refresh_token(data={"sub": str(user.id)})
+
+        log_audit(str(user.id), "refresh", "token", status="success", request_id=request_id)
 
         return {
             "access_token": access_token,
