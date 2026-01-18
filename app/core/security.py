@@ -2,14 +2,13 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from enum import Enum
 from app.config import settings
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 from app.repository import user_repository
-from .hashing import verify_password
 
 # --- User Roles ---
 class UserRole(str, Enum):

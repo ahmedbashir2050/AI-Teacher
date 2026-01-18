@@ -85,7 +85,7 @@ async def chat(
         "message",
         "chat_session",
         resource_id=str(session_id),
-        details=metadata,
+        metadata=metadata,
         request_id=request_id
     )
     return ChatResponse(message=assistant_message, session_id=session_id)

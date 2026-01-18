@@ -17,7 +17,7 @@ from app.config import settings
 # Import the models package. This is crucial for Alembic's autogenerate to
 # detect the models and their metadata. The __init__.py file in app/models
 # ensures all model classes are loaded.
-from app import models
+import app.models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

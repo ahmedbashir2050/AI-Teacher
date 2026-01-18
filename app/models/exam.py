@@ -1,9 +1,7 @@
 # app/models/exam.py
-from sqlalchemy import Column, Integer, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from app.db.base import BaseModel
-from app.models.user import User
-from app.models.academics import Course
 
 class Exam(BaseModel):
     """

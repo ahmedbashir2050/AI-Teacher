@@ -2,8 +2,6 @@
 from sqlalchemy import Column, String, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from app.db.base import BaseModel
-from app.models.user import User
-from app.models.academics import Book
 
 class ChatSession(BaseModel):
     """

@@ -1,9 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from app.main import app
 from app.core.security import create_access_token, UserRole
-import time
 
 client = TestClient(app)
 

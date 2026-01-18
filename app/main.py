@@ -4,7 +4,6 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.api import chat, summarize, exam, flashcards, ingest, auth, admin
-from app.core.security import get_current_user
 from app.core.logging import get_logger
 from app.core.limiter import limiter
 import time
@@ -14,6 +13,11 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from app.core.security import decode_token
+from app.core.cache import redis_client
+from app.services.qdrant_service import qdrant_service
+from fastapi import Response
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -47,8 +51,6 @@ if settings.ENVIRONMENT == "development":
 
 FastAPIInstrumentor.instrument_app(app, tracer_provider=provider)
 
-from app.core.security import decode_token
-
 def get_username_from_request(request: Request) -> str | None:
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
@@ -64,7 +66,7 @@ async def log_requests(request: Request, call_next):
     start_time = time.time()
     username = get_username_from_request(request)
 
-    logger.info(f"start_request", extra={
+    logger.info("start_request", extra={
         "request_id": request_id,
         "method": request.method,
         "path": request.url.path,
@@ -76,7 +78,7 @@ async def log_requests(request: Request, call_next):
 
     process_time = (time.time() - start_time) * 1000
 
-    logger.info(f"end_request", extra={
+    logger.info("end_request", extra={
         "request_id": request_id,
         "method": request.method,
         "path": request.url.path,
@@ -99,11 +101,6 @@ app.include_router(chat.router, prefix="/api", tags=["Chat"])
 app.include_router(summarize.router, prefix="/api", tags=["Summarize"])
 app.include_router(flashcards.router, prefix="/api", tags=["Flashcards"])
 app.include_router(exam.router, prefix="/api", tags=["Exam"])
-
-from app.core.cache import redis_client
-from app.services.qdrant_service import qdrant_service
-from fastapi import Response
-import asyncio
 
 @app.on_event("shutdown")
 async def shutdown_event():

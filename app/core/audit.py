@@ -19,7 +19,7 @@ def log_audit(
     """
     audit_entry = {
         "timestamp": time.time(),
-        "service_name": "rag-service",
+        "service_name": "monolith-app",
         "event_type": "audit",
         "user_id": user_id,
         "action": action,

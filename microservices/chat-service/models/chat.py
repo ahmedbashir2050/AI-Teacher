@@ -13,6 +13,6 @@ class ChatSession(BaseModel):
 
 class ChatMessage(BaseModel):
     __tablename__ = 'chat_messages'
-    session_id = Column(UUID(as_uuid=True), ForeignKey('chat_sessions.id'), nullable=False)
+    session_id = Column(UUID(as_uuid=True), ForeignKey('chat_sessions.id'), index=True, nullable=False)
     role = Column(String(50), nullable=False) # 'user' or 'assistant'
     content = Column(Text, nullable=False)

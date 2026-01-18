@@ -77,7 +77,7 @@ async def generate_and_store_exam(db: Session, user_id: str, course_id: str, col
         action="generate_complete",
         resource="exam",
         resource_id=str(db_exam.id),
-        details={
+        metadata={
             "course_id": course_id,
             "mcq_count": mcq_count,
             "theory_count": theory_count

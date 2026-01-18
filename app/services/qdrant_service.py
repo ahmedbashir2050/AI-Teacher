@@ -20,10 +20,10 @@ class QdrantService:
         Creates a new collection in Qdrant if it doesn't already exist.
         """
         try:
-            collection_info = self.client.get_collection(collection_name=self.collection_name)
+            self.client.get_collection(collection_name=self.collection_name)
             logger.info(f"Collection '{self.collection_name}' already exists.")
             # You might want to add a check here to ensure the vector size matches
-        except Exception as e:
+        except Exception:
             logger.info(f"Collection '{self.collection_name}' not found. Creating new collection.")
             self.client.recreate_collection(
                 collection_name=self.collection_name,

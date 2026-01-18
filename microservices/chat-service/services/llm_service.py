@@ -80,7 +80,7 @@ Output JSON:
             result = json.loads(response_text)
             await redis.setex(cache_key, 3600, json.dumps(result)) # Cache for 1 hour
             return result
-        except:
+        except Exception:
             return {"intent": "GENERAL", "mode": "UNDERSTANDING", "rewritten_query": user_message}
 
     async def rerank_results(self, query: str, chunks: list[str]) -> list[str]:
@@ -104,7 +104,7 @@ Example: 2, 0, 4
         try:
             indices = [int(idx.strip()) for idx in response_text.split(",") if idx.strip().isdigit()]
             return [chunks[i] for i in indices if i < len(chunks)]
-        except:
+        except Exception:
             return chunks[:3] # Fallback to top 3
 
     async def summarize_learning_state(self, current_summary: str, history: str) -> str:
@@ -163,7 +163,8 @@ Keep it concise and objective.
         return await redis.get(key)
 
     async def cache_response(self, faculty: str, semester: str, question: str, response: str):
-        if len(response) < 50: return # Don't cache short/error responses
+        if len(response) < 50:
+            return # Don't cache short/error responses
         redis = await self._get_redis()
         norm_q = question.strip().lower()
         key = f"ans_cache:{faculty}:{semester}:{hashlib.md5(norm_q.encode()).hexdigest()}"

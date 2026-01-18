@@ -8,7 +8,6 @@ from db.session import get_db
 from repository import user_repository
 from core.config import settings
 from core.security import create_access_token, create_refresh_token, verify_password
-from models.user import RoleEnum
 from core.audit import log_audit
 
 router = APIRouter()
@@ -36,7 +35,7 @@ class Token(BaseModel):
 def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     request_id = getattr(request.state, "request_id", None)
     if user_repository.get_user_by_email(db, email=user_in.email):
-        log_audit("anonymous", "register", "user", status="failure", details={"reason": "email_exists"}, request_id=request_id)
+        log_audit("anonymous", "register", "user", status="failure", metadata={"reason": "email_exists"}, request_id=request_id)
         raise HTTPException(status_code=400, detail="Email already registered")
     if user_repository.get_user_by_username(db, username=user_in.username):
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -58,7 +57,7 @@ def login(request: Request, db: Session = Depends(get_db), form_data: OAuth2Pass
         user = user_repository.get_user_by_email(db, email=form_data.username)
 
     if not user or not verify_password(form_data.password, user.hashed_password):
-        log_audit(form_data.username, "login", "user", status="failure", details={"reason": "invalid_credentials"}, request_id=request_id)
+        log_audit(form_data.username, "login", "user", status="failure", metadata={"reason": "invalid_credentials"}, request_id=request_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -138,3 +137,29 @@ def refresh_token(request: Request, refresh_token: str, db: Session = Depends(ge
         }
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+class RoleUpdate(BaseModel):
+    user_id: str
+    new_role: RoleEnum
+
+@router.put("/roles", status_code=status.HTTP_200_OK)
+async def update_user_role(request: Request, update: RoleUpdate, db: Session = Depends(get_db)):
+    # In a real app, this would be protected by ADMIN role
+    request_id = getattr(request.state, "request_id", None)
+    user = db.query(user_repository.User).filter(user_repository.User.id == update.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_role = user.role.value
+    user.role = update.new_role
+    db.commit()
+
+    log_audit(
+        user_id="admin", # Assume admin caller
+        action="update_role",
+        resource="user",
+        resource_id=update.user_id,
+        metadata={"old_role": old_role, "new_role": update.new_role.value},
+        request_id=request_id
+    )
+    return {"message": "Role updated successfully"}

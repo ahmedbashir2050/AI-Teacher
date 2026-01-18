@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models.exam import Exam, Question, ExamAttempt
+from models.exam import Exam, Question
 from uuid import UUID, uuid4
 
 def create_exam(db: Session, title: str, course_id: str, creator_id: str):
@@ -23,7 +23,7 @@ def create_exam_question(db: Session, exam_id: UUID, content: str, options: list
     return db_q
 
 def get_exam(db: Session, exam_id: UUID):
-    return db.query(Exam).filter(Exam.id == exam_id).first()
+    return db.query(Exam).filter(Exam.id == exam_id, Exam.is_deleted.is_(None)).first()
 
 def get_exam_questions(db: Session, exam_id: UUID):
-    return db.query(Question).filter(Question.exam_id == exam_id).all()
+    return db.query(Question).filter(Question.exam_id == exam_id, Question.is_deleted.is_(None)).all()

@@ -5,7 +5,7 @@ from repository import exam_repository
 from tasks import generate_exam_task
 from core.audit import log_audit
 from pydantic import BaseModel
-from typing import List, Optional, Any
+from typing import Optional
 from uuid import UUID
 
 router = APIRouter()
@@ -46,7 +46,7 @@ async def generate_exam(
         user_id=x_user_id,
         action="generate_request",
         resource="exam",
-        details={
+        metadata={
             "course_id": request.course_id,
             "collection_name": request.collection_name,
             "task_id": task.id

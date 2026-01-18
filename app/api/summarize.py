@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from app.models.requests import SummarizeRequest
 from app.models.responses import SummarizeResponse
 from app.rag.retriever import retrieve_relevant_chunks

@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 
 def get_chat_session(db: Session, session_id: UUID):
-    return db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.deleted_at == None).first()
+    return db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.is_deleted.is_(None)).first()
 
 def create_chat_session(db: Session, user_id: str, collection_name: str = None, faculty_id: str = None, semester_id: str = None):
     session = ChatSession(
@@ -23,7 +23,7 @@ def get_latest_learning_summary(db: Session, user_id: str, collection_name: str)
     latest_session = db.query(ChatSession).filter(
         ChatSession.user_id == user_id,
         ChatSession.collection_name == collection_name,
-        ChatSession.learning_summary != None
+        ChatSession.learning_summary.is_not(None)
     ).order_by(ChatSession.created_at.desc()).first()
     return latest_session.learning_summary if latest_session else None
 
@@ -48,7 +48,7 @@ def create_chat_message(db: Session, session_id: UUID, role: str, content: str):
 def soft_delete_session(db: Session, session_id: UUID, user_id: str):
     session = db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == user_id).first()
     if session:
-        session.deleted_at = datetime.utcnow()
+        session.is_deleted = datetime.utcnow()
         db.commit()
         return True
     return False

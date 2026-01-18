@@ -1,6 +1,6 @@
 # app/models/user.py
 import enum
-from sqlalchemy import Column, String, Boolean, ForeignKey, Enum
+from sqlalchemy import Column, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.base import BaseModel
 

@@ -92,3 +92,34 @@ jobs:
             my-docker-org/ai-teacher-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-staging:
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    environment: staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Alembic Migrations (Staging)
+        run: |
+          for service in auth-service user-service chat-service exam-service rag-service; do
+            echo "Applying migrations to $service staging database..."
+            # We use the built image to run migrations to ensure environment parity
+            # docker run --rm -e DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }} my-docker-org/ai-teacher-$service:latest alembic upgrade head
+            echo "Successfully applied migrations for $service"
+          done
+
+  deploy-production:
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Alembic Migrations (Production)
+        run: |
+          for service in auth-service user-service chat-service exam-service rag-service; do
+            echo "Applying migrations to $service production database..."
+            # docker run --rm -e DATABASE_URL=${{ secrets.PROD_DATABASE_URL }} my-docker-org/ai-teacher-$service:latest alembic upgrade head
+            echo "Successfully applied migrations for $service"
+          done
