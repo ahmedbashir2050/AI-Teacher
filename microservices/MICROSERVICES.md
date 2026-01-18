@@ -1,40 +1,49 @@
 # AI-Teacher Production Microservices Architecture
 
 ## 🏗️ Architecture Overview
-The system is transformed into a production-grade, highly available microservices mesh.
+The system is a production-grade, highly available microservices mesh designed to serve 100k+ concurrent users.
 
-### Components:
-1.  **NGINX (Edge Gateway)**: Single public entry point. Handles SSL termination, IP-based rate limiting, and static/response caching.
-2.  **API Gateway (Auth & Routing)**: FastAPI-based internal gateway. Performs JWT validation, per-user rate limiting, and routes requests to downstream services with identity headers (`X-User-Id`, `X-User-Role`).
-3.  **Microservices**: Replicated services (rag, chat, exam, etc.) handling core business logic.
-4.  **Celery Workers**: Asynchronous task processors for heavy operations (Exam generation, PDF ingestion).
-5.  **Redis**: Multi-purpose layer for caching, rate limiting, and message brokering.
-6.  **PgBouncer**: Connection pooler for PostgreSQL to handle thousands of concurrent DB connections.
-7.  **Qdrant**: Scaled vector database with physical sharding and replication.
-8.  **Monitoring Stack**: Prometheus and Grafana for full observability.
+### Core Services:
+- **NGINX (Edge Gateway)**: Single public entry point. Handles SSL, IP-based rate limiting, security headers, and response caching.
+- **API Gateway**: FastAPI-based. Performs JWT validation, per-user rate limiting (Redis), and routes requests with identity injection.
+- **Auth Service**: Manages users, JWT issuance, and authentication.
+- **User Service**: Manages academic hierarchy (Faculty, Department, Semester, Course, Book) and user profiles.
+- **Chat Service (AI Tutor)**: Core AI logic, RAG pipeline orchestration, and pedagogical structured responses.
+- **RAG Service**: PDF ingestion, chunking, embedding, and vector retrieval.
+- **Exam Service**: Automated exam generation and student attempt tracking.
+- **Notification Service**: Async delivery of system events via Celery.
 
-## 🚦 Scale Strategy (100k+ Users)
-- **Horizontal Scaling**: All services are stateless and run with multiple replicas.
-- **Async Processing**: Long-running AI tasks are offloaded to workers, returning a `task_id` to the client.
-- **Connection Pooling**: PgBouncer prevents database connection exhaustion.
-- **Caching**: Multi-level caching (NGINX edge, Redis application-level, Redis LLM-level).
-- **Qdrant Sharding**: Collections are sharded across nodes to handle massive vector searches.
+## 🚦 Scale & Performance Strategy
+- **Horizontal Scaling**: Core services (`chat`, `rag`, `exam`) run with 3-5+ replicas.
+- **Database Hardening**:
+  - **PgBouncer**: Integrated for transaction pooling (supports 10k+ connections).
+  - **Read Replicas**: All services support `READ_DATABASE_URL` to offload load from the primary writer.
+- **Standardized Caching**: Standardized Redis caching layer in `core/cache.py` used by all services for expensive DB/LLM calls.
+- **Async Mesh**: Offloads heavy tasks (PDF processing, Exam generation) to Celery/Redis workers.
+- **Vector Isolation**: Qdrant collections use physical sharding (4 shards) and replication (2x). Data is logically partitioned by `faculty_id`, `department_id`, and `semester_id`.
 
-## 🔐 Security Hardening
-- **Zero Trust Internal Network**: Only NGINX is exposed. All other services communicate over a private network.
-- **Centralized Auth**: JWT validation is strictly enforced at the API Gateway.
-- **Identity Propagation**: Identity headers are injected by the Gateway and trusted by downstream services.
+## 🔐 Security & Governance
+- **Trust Boundary**: Gateway validates JWT and injects `X-User-Id`, `X-User-Role`. Downstream services enforce these headers.
+- **Data Isolation**: Strict multi-tenant-like isolation in vector search and relational queries using academic context filters.
+- **Hardened Nginx**: CSP headers, XSS protection, and frame-ancestors enforced at the edge.
 
-## 📈 Observability
-- **Metrics**: `/metrics` endpoints on all services (Prometheus format).
-- **Logging**: Centralized logs with `X-Request-ID` correlation.
-- **Dashboards**: Grafana dashboards for system health and performance.
+## 📈 Observability & Monitoring
+- **Distributed Tracing**: OpenTelemetry integrated across all services for request tracing.
+- **Structured Logging**: All services use JSON logging with `X-Request-ID` correlation.
+- **Prometheus/Grafana**: Full stack monitoring with DNS-based service discovery for scaled replicas.
+- **Health Checks**: Standard `/health` endpoints for orchestration readiness.
 
-## 🚀 Deployment
-1.  Set environment variables in `.env`.
-2.  Run `docker-compose up --build -d`.
-3.  Access the system via NGINX on port 80.
-4.  Monitor via Grafana on port 3000.
+## 🛠️ CI/CD & DevOps
+- **GitHub Actions**: Automated pipeline for building and pushing tagged Docker images.
+- **Docker Best Practices**: Optimized `.dockerignore`, image versioning, and non-root execution (recommended).
 
-## ⚠️ Breaking Changes
-- **Async Operations**: `/api/exams/generate` and `/api/rag/ingest` now return a `task_id` and status `accepted`. Clients should poll or wait for notifications.
+## 🚀 Deployment Instructions
+1.  **Configure Environment**: Copy `.env.example` to `.env` and fill in secrets (JWT, OpenAI).
+2.  **Infrastructure**: Ensure Redis and PostgreSQL are reachable.
+3.  **Start Services**: `docker-compose up -d --scale chat-service=5 --scale rag-service=5`
+4.  **Access**: Entry point is `http://localhost:80`.
+
+## 📜 Scaling Assumptions
+- **User Load**: Optimized for 100k+ users via Nginx load balancing and service replication.
+- **LLM Latency**: Mitigated via 6h-24h Redis caching of embeddings and common answers.
+- **DB Concurrency**: Managed by PgBouncer and Read Replicas.

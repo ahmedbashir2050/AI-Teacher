@@ -89,6 +89,7 @@ services:
       - ai-teacher-network
 
   api-gateway:
+    image: my-docker-org/ai-teacher-api-gateway:latest
     build:
       context: ./api-gateway
     deploy:
@@ -111,6 +112,7 @@ services:
       - ai-teacher-network
 
   auth-service:
+    image: my-docker-org/ai-teacher-auth-service:latest
     build:
       context: ./auth-service
     deploy:
@@ -126,6 +128,7 @@ services:
       - ai-teacher-network
 
   user-service:
+    image: my-docker-org/ai-teacher-user-service:latest
     build:
       context: ./user-service
     deploy:
@@ -138,6 +141,7 @@ services:
       - ai-teacher-network
 
   chat-service:
+    image: my-docker-org/ai-teacher-chat-service:latest
     build:
       context: ./chat-service
     deploy:
@@ -154,6 +158,7 @@ services:
       - ai-teacher-network
 
   rag-service:
+    image: my-docker-org/ai-teacher-rag-service:latest
     build:
       context: ./rag-service
     deploy:
@@ -171,6 +176,7 @@ services:
       - ai-teacher-network
 
   exam-service:
+    image: my-docker-org/ai-teacher-exam-service:latest
     build:
       context: ./exam-service
     deploy:
@@ -187,6 +193,7 @@ services:
       - ai-teacher-network
 
   exam-worker:
+    image: my-docker-org/ai-teacher-exam-service:latest
     build:
       context: ./exam-service
     command: celery -A tasks.celery_app worker --loglevel=info
@@ -202,6 +209,7 @@ services:
       - ai-teacher-network
 
   rag-worker:
+    image: my-docker-org/ai-teacher-rag-service:latest
     build:
       context: ./rag-service
     command: celery -A tasks.celery_app worker --loglevel=info
@@ -218,8 +226,23 @@ services:
       - ai-teacher-network
 
   notification-service:
+    image: my-docker-org/ai-teacher-notification-service:latest
     build:
       context: ./notification-service
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    networks:
+      - ai-teacher-network
+
+  notification-worker:
+    image: my-docker-org/ai-teacher-notification-service:latest
+    build:
+      context: ./notification-service
+    command: celery -A tasks.celery_app worker --loglevel=info
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
     networks:
       - ai-teacher-network
 

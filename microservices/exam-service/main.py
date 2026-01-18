@@ -1,19 +1,20 @@
 import uuid
-import logging
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from api.exam import router as exam_router
 from db.base import Base
 from db.session import engine
+from core.observability import setup_logging, setup_tracing, instrument_app
 
-# Configure Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Setup observability
+logger = setup_logging("exam-service")
+setup_tracing("exam-service")
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Exam Service", version="1.0.0")
 Instrumentator().instrument(app).expose(app)
+instrument_app(app, "exam-service")
 
 @app.middleware("http")
 async def security_and_correlation_middleware(request: Request, call_next):

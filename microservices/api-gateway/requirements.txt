@@ -7,3 +7,8 @@ fastapi-limiter
 redis
 aioredis
 prometheus-fastapi-instrumentator
+python-json-logger
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-exporter-otlp

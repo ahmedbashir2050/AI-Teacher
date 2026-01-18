@@ -12,3 +12,8 @@ langchain-openai
 celery[redis]
 prometheus-fastapi-instrumentator
 aioredis
+python-json-logger
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-exporter-otlp

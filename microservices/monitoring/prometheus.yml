@@ -3,25 +3,50 @@ global:
 
 scrape_configs:
   - job_name: 'api-gateway'
-    static_configs:
-      - targets: ['api-gateway:8000']
+    dns_sd_configs:
+      - names:
+          - 'tasks.api-gateway'
+        type: 'A'
+        port: 8000
 
   - job_name: 'auth-service'
-    static_configs:
-      - targets: ['auth-service:8000']
+    dns_sd_configs:
+      - names:
+          - 'tasks.auth-service'
+        type: 'A'
+        port: 8000
 
   - job_name: 'user-service'
-    static_configs:
-      - targets: ['user-service:8000']
+    dns_sd_configs:
+      - names:
+          - 'tasks.user-service'
+        type: 'A'
+        port: 8000
 
   - job_name: 'chat-service'
-    static_configs:
-      - targets: ['chat-service:8000']
+    dns_sd_configs:
+      - names:
+          - 'tasks.chat-service'
+        type: 'A'
+        port: 8000
 
   - job_name: 'rag-service'
-    static_configs:
-      - targets: ['rag-service:8000']
+    dns_sd_configs:
+      - names:
+          - 'tasks.rag-service'
+        type: 'A'
+        port: 8000
 
   - job_name: 'exam-service'
-    static_configs:
-      - targets: ['exam-service:8000']
+    dns_sd_configs:
+      - names:
+          - 'tasks.exam-service'
+        type: 'A'
+        port: 8000
+
+  - job_name: 'notification-service'
+    dns_sd_configs:
+      - names:
+          - 'tasks.notification-service'
+        type: 'A'
+        port: 8000
