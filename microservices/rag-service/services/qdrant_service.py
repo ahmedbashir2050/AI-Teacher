@@ -24,10 +24,14 @@ class QdrantService:
             logger.info(f"Collection '{self.collection_name}' already exists.")
             # You might want to add a check here to ensure the vector size matches
         except Exception as e:
-            logger.info(f"Collection '{self.collection_name}' not found. Creating new collection.")
-            self.client.recreate_collection(
+            logger.info(f"Collection '{self.collection_name}' not found. Creating new collection with sharding.")
+            # Production-grade: Enable sharding and replication
+            self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=models.VectorParams(size=vector_size, distance=distance),
+                shard_number=4,       # Shard across 4 nodes/processes
+                replication_factor=2,  # Maintain 2 copies for high availability
+                write_consistency_factor=1,
             )
             logger.info(f"Successfully created collection '{self.collection_name}'.")
 

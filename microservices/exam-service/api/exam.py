@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 from ..db.session import get_db
-from ..services import exam_service
 from ..repository import exam_repository
+from ..tasks import generate_exam_task
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 from uuid import UUID
 
 router = APIRouter()
@@ -16,9 +16,11 @@ class ExamCreateRequest(BaseModel):
     theory_count: int = 2
 
 class ExamResponse(BaseModel):
-    id: UUID
-    title: str
+    id: Optional[UUID] = None
+    title: Optional[str] = None
     course_id: str
+    status: str = "pending"
+    task_id: Optional[str] = None
 
 @router.post("/generate", response_model=ExamResponse)
 async def generate_exam(
@@ -29,18 +31,21 @@ async def generate_exam(
 ):
     request_id = getattr(fastapi_req.state, "request_id", None)
 
-    exam = await exam_service.generate_and_store_exam(
-        db,
-        user_id=x_user_id,
-        course_id=request.course_id,
-        collection_name=request.collection_name,
-        mcq_count=request.mcq_count,
-        theory_count=request.theory_count,
-        request_id=request_id
+    # Trigger async task
+    task = generate_exam_task.delay(
+        x_user_id,
+        request.course_id,
+        request.collection_name,
+        request.mcq_count,
+        request.theory_count,
+        request_id
     )
-    if not exam:
-        raise HTTPException(status_code=500, detail="Failed to generate exam")
-    return exam
+
+    return ExamResponse(
+        course_id=request.course_id,
+        status="accepted",
+        task_id=task.id
+    )
 
 @router.get("/{exam_id}", response_model=ExamResponse)
 def get_exam(exam_id: UUID, db: Session = Depends(get_db)):

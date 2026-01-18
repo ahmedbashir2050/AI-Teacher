@@ -6,3 +6,4 @@ pydantic-settings
 fastapi-limiter
 redis
 aioredis
+prometheus-fastapi-instrumentator

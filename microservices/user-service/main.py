@@ -1,10 +1,11 @@
 import uuid
 import logging
 from fastapi import FastAPI, Request, Response, HTTPException
-from .api.academics import router as academics_router
-from .api.profiles import router as profiles_router
-from .db.base import Base
-from .db.session import engine
+from prometheus_fastapi_instrumentator import Instrumentator
+from api.academics import router as academics_router
+from api.profiles import router as profiles_router
+from db.base import Base
+from db.session import engine
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="User Service", version="1.0.0")
+Instrumentator().instrument(app).expose(app)
 
 @app.middleware("http")
 async def security_and_correlation_middleware(request: Request, call_next):

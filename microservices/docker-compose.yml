@@ -1,14 +1,25 @@
 version: '3.8'
 
 services:
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - ai-teacher-network
+
   db-auth:
     image: postgres:15-alpine
     environment:
       POSTGRES_DB: auth_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5433:5432"
+    networks:
+      - ai-teacher-network
 
   db-user:
     image: postgres:15-alpine
@@ -16,8 +27,8 @@ services:
       POSTGRES_DB: user_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5434:5432"
+    networks:
+      - ai-teacher-network
 
   db-chat:
     image: postgres:15-alpine
@@ -25,8 +36,8 @@ services:
       POSTGRES_DB: chat_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5435:5432"
+    networks:
+      - ai-teacher-network
 
   db-rag:
     image: postgres:15-alpine
@@ -34,8 +45,8 @@ services:
       POSTGRES_DB: rag_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5436:5432"
+    networks:
+      - ai-teacher-network
 
   db-exam:
     image: postgres:15-alpine
@@ -43,22 +54,47 @@ services:
       POSTGRES_DB: exam_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-    ports:
-      - "5437:5432"
+    networks:
+      - ai-teacher-network
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes
+    networks:
+      - ai-teacher-network
 
   qdrant:
     image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+    networks:
+      - ai-teacher-network
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    environment:
+      - DATABASE_URL=postgresql://user:password@db-auth:5432/auth_db
+      - MAX_CLIENT_CONN=10000
+      - DEFAULT_POOL_SIZE=20
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      - db-auth
+      - db-user
+      - db-chat
+      - db-rag
+      - db-exam
+    networks:
+      - ai-teacher-network
 
   api-gateway:
     build:
       context: ./api-gateway
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
     environment:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
@@ -69,67 +105,143 @@ services:
       CHAT_SERVICE_URL: http://chat-service:8000
       RAG_SERVICE_URL: http://rag-service:8000
       EXAM_SERVICE_URL: http://exam-service:8000
-    ports:
-      - "8080:8000"
     depends_on:
       - redis
+    networks:
+      - ai-teacher-network
 
   auth-service:
     build:
       context: ./auth-service
+    deploy:
+      replicas: 2
     environment:
-      DATABASE_URL: postgresql://user:password@db-auth:5432/auth_db
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/auth_db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_ISSUER: ${JWT_ISSUER}
     depends_on:
       - db-auth
+    networks:
+      - ai-teacher-network
 
   user-service:
     build:
       context: ./user-service
+    deploy:
+      replicas: 2
     environment:
-      DATABASE_URL: postgresql://user:password@db-user:5432/user_db
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/user_db
     depends_on:
       - db-user
+    networks:
+      - ai-teacher-network
 
   chat-service:
     build:
       context: ./chat-service
+    deploy:
+      replicas: 5
     environment:
-      DATABASE_URL: postgresql://user:password@db-chat:5432/chat_db
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/chat_db
       REDIS_URL: redis://redis:6379
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       RAG_SERVICE_URL: http://rag-service:8000
     depends_on:
       - db-chat
       - redis
+    networks:
+      - ai-teacher-network
 
   rag-service:
     build:
       context: ./rag-service
+    deploy:
+      replicas: 5
     environment:
-      DATABASE_URL: postgresql://user:password@db-rag:5432/rag_db
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/rag_db
       QDRANT_URL: http://qdrant:6333
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - db-rag
       - qdrant
+      - redis
+    networks:
+      - ai-teacher-network
 
   exam-service:
     build:
       context: ./exam-service
+    deploy:
+      replicas: 3
     environment:
-      DATABASE_URL: postgresql://user:password@db-exam:5432/exam_db
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/exam_db
       RAG_SERVICE_URL: http://rag-service:8000
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - db-exam
+      - redis
+    networks:
+      - ai-teacher-network
+
+  exam-worker:
+    build:
+      context: ./exam-service
+    command: celery -A tasks.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/exam_db
+      RAG_SERVICE_URL: http://rag-service:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db-exam
+      - redis
+    networks:
+      - ai-teacher-network
+
+  rag-worker:
+    build:
+      context: ./rag-service
+    command: celery -A tasks.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://user:password@pgbouncer:6432/rag_db
+      QDRANT_URL: http://qdrant:6333
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db-rag
+      - qdrant
+      - redis
+    networks:
+      - ai-teacher-network
 
   notification-service:
     build:
       context: ./notification-service
+    networks:
+      - ai-teacher-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - ai-teacher-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - ai-teacher-network
 
 networks:
-  default:
-    name: ai-teacher-network
+  ai-teacher-network:
+    driver: bridge

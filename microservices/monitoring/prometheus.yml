@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8000']
+
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8000']
+
+  - job_name: 'chat-service'
+    static_configs:
+      - targets: ['chat-service:8000']
+
+  - job_name: 'rag-service'
+    static_configs:
+      - targets: ['rag-service:8000']
+
+  - job_name: 'exam-service'
+    static_configs:
+      - targets: ['exam-service:8000']

@@ -1,50 +1,40 @@
-# AI-Teacher Microservices Architecture
+# AI-Teacher Production Microservices Architecture
 
-This document describes the production-grade microservices architecture for the AI-Teacher platform.
+## 🏗️ Architecture Overview
+The system is transformed into a production-grade, highly available microservices mesh.
 
-## 🏗️ Directory Structure
-```
-microservices/
-├── api-gateway/          # Thin proxy, JWT validation, Global rate limiting
-├── auth-service/         # User Auth, JWT Issuance, PostgreSQL (auth_db)
-├── user-service/         # Profiles, Academics Hierarchy, PostgreSQL (user_db)
-├── chat-service/         # Sessions, Messages, LLM Integration, PostgreSQL (chat_db)
-├── rag-service/          # PDF Ingestion, Vector Search, Qdrant + PostgreSQL (rag_db)
-├── exam-service/         # Exam Generation/Grading, PostgreSQL (exam_db)
-├── notification-service/ # Async Notifications (Skeleton)
-└── docker-compose.yml    # Local orchestration
-```
+### Components:
+1.  **NGINX (Edge Gateway)**: Single public entry point. Handles SSL termination, IP-based rate limiting, and static/response caching.
+2.  **API Gateway (Auth & Routing)**: FastAPI-based internal gateway. Performs JWT validation, per-user rate limiting, and routes requests to downstream services with identity headers (`X-User-Id`, `X-User-Role`).
+3.  **Microservices**: Replicated services (rag, chat, exam, etc.) handling core business logic.
+4.  **Celery Workers**: Asynchronous task processors for heavy operations (Exam generation, PDF ingestion).
+5.  **Redis**: Multi-purpose layer for caching, rate limiting, and message brokering.
+6.  **PgBouncer**: Connection pooler for PostgreSQL to handle thousands of concurrent DB connections.
+7.  **Qdrant**: Scaled vector database with physical sharding and replication.
+8.  **Monitoring Stack**: Prometheus and Grafana for full observability.
 
-## 🔐 Security & Identity
-- **Auth Service** is the only one that issues JWTs.
-- **API Gateway** validates JWTs for all protected routes.
-- **Gateway** extracts `sub` (User ID) and `role` from JWT and passes them as `X-User-Id` and `X-User-Role` headers to downstream services.
-- **Trust Boundary**: Downstream services enforce that identity headers are present and originate from the internal network.
+## 🚦 Scale Strategy (100k+ Users)
+- **Horizontal Scaling**: All services are stateless and run with multiple replicas.
+- **Async Processing**: Long-running AI tasks are offloaded to workers, returning a `task_id` to the client.
+- **Connection Pooling**: PgBouncer prevents database connection exhaustion.
+- **Caching**: Multi-level caching (NGINX edge, Redis application-level, Redis LLM-level).
+- **Qdrant Sharding**: Collections are sharded across nodes to handle massive vector searches.
 
-## 🆔 Request Correlation
-- **X-Request-ID** is generated/forwarded by the Gateway and propagated across all service-to-service calls.
-- This allows end-to-end tracing of a single request across the entire microservices mesh.
+## 🔐 Security Hardening
+- **Zero Trust Internal Network**: Only NGINX is exposed. All other services communicate over a private network.
+- **Centralized Auth**: JWT validation is strictly enforced at the API Gateway.
+- **Identity Propagation**: Identity headers are injected by the Gateway and trusted by downstream services.
 
-## 🚦 Rate Limiting
-- **Global**: Enforced at the API Gateway (e.g., 100 req/min).
-- **Per-User**: Enforced in `chat-service` (20 req/min/user) using Redis and `X-User-Id` as the identifier.
+## 📈 Observability
+- **Metrics**: `/metrics` endpoints on all services (Prometheus format).
+- **Logging**: Centralized logs with `X-Request-ID` correlation.
+- **Dashboards**: Grafana dashboards for system health and performance.
 
-## 📡 API Contracts (Key Endpoints)
+## 🚀 Deployment
+1.  Set environment variables in `.env`.
+2.  Run `docker-compose up --build -d`.
+3.  Access the system via NGINX on port 80.
+4.  Monitor via Grafana on port 3000.
 
-### Gateway (8080)
-- `POST /api/auth/register` -> `auth-service:8000/auth/register`
-- `POST /api/auth/login` -> `auth-service:8000/auth/login`
-- `POST /api/chat/chat` -> `chat-service:8000/chat`
-- `POST /api/rag/ingest` -> `rag-service:8000/ingest`
-- `POST /api/rag/search` -> `rag-service:8000/search`
-- `POST /api/exams/generate` -> `exam-service:8000/generate`
-
-## 🛠️ Local Development
-1. `cd microservices`
-2. `cp .env.example .env` (Update with your keys)
-3. `docker-compose up --build`
-
-## 🚀 National Scale Readiness
-- **Async I/O**: All LLM and inter-service calls use `AsyncOpenAI` and `httpx.AsyncClient` to maximize concurrency.
-- **Fault Tolerance**: Bounded retries (tenacity) and explicit timeouts protect against cascading failures.
-- **Statelessness**: All containers are stateless and safe for horizontal scaling (K8s ready).
+## ⚠️ Breaking Changes
+- **Async Operations**: `/api/exams/generate` and `/api/rag/ingest` now return a `task_id` and status `accepted`. Clients should poll or wait for notifications.
