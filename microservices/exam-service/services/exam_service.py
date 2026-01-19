@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=2))
-async def call_rag_search(collection_name: str, request_id: str):
+async def call_rag_search(
+    collection_name: str, faculty_id: str, semester_id: str, request_id: str
+):
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
             f"{settings.RAG_SERVICE_URL}/search",
@@ -21,6 +23,8 @@ async def call_rag_search(collection_name: str, request_id: str):
                 "query": "Exam material",
                 "top_k": 15,
                 "collection_name": collection_name,
+                "faculty_id": faculty_id,
+                "semester_id": semester_id,
             },
             headers={"X-Request-ID": request_id},
         )
@@ -28,8 +32,13 @@ async def call_rag_search(collection_name: str, request_id: str):
         return resp.json()
 
 
-def create_exam_prompt(context: list[str], mcq_count: int, theory_count: int) -> str:
-    context_str = "\n\n".join(context)
+def create_exam_prompt(context: list[dict], mcq_count: int, theory_count: int) -> str:
+    formatted_chunks = []
+    for i, chunk in enumerate(context):
+        formatted_chunks.append(
+            f"Chunk [{i}] (Source: {chunk.get('source')}, Page: {chunk.get('page')}):\n{chunk.get('text')}"
+        )
+    context_str = "\n\n".join(formatted_chunks)
     prompt = f"""
 Based ONLY on the provided academic text, generate a university-level exam.
 The exam must contain exactly {mcq_count} multiple-choice questions and {theory_count} theory-based essay questions.
@@ -53,14 +62,18 @@ async def generate_and_store_exam(
     user_id: str,
     course_id: str,
     collection_name: str,
+    faculty_id: str,
+    semester_id: str,
     mcq_count: int,
     theory_count: int,
     request_id: str = None,
 ):
     relevant_chunks = []
     try:
-        results = await call_rag_search(collection_name, request_id)
-        relevant_chunks = [r["text"] for r in results]
+        results = await call_rag_search(
+            collection_name, faculty_id, semester_id, request_id
+        )
+        relevant_chunks = results
     except Exception as e:
         logger.error(
             f"Error calling RAG service for exam: {e}", extra={"request_id": request_id}

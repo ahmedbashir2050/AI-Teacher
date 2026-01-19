@@ -1,3 +1,4 @@
+from typing import Optional
 from core.audit import log_audit
 from core.cache import cache_result
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -16,11 +17,15 @@ class SearchRequest(BaseModel):
     collection_name: str
     faculty_id: str
     semester_id: str
+    department_id: Optional[str] = None
 
 
 class SearchResult(BaseModel):
     text: str
     score: float
+    source: str
+    page: int
+    book_id: str
 
 
 @router.post("/search")
@@ -37,22 +42,35 @@ async def _do_search(request: SearchRequest):
     query_vector = await generate_embedding(request.query)
     try:
         # Enforce Faculty + Semester isolation
-        query_filter = models.Filter(
-            must=[
+        must_conditions = [
+            models.FieldCondition(
+                key="faculty_id", match=models.MatchValue(value=request.faculty_id)
+            ),
+            models.FieldCondition(
+                key="semester_id",
+                match=models.MatchValue(value=request.semester_id),
+            ),
+        ]
+        if request.department_id:
+            must_conditions.append(
                 models.FieldCondition(
-                    key="faculty_id", match=models.MatchValue(value=request.faculty_id)
-                ),
-                models.FieldCondition(
-                    key="semester_id",
-                    match=models.MatchValue(value=request.semester_id),
-                ),
-            ]
-        )
+                    key="department_id",
+                    match=models.MatchValue(value=request.department_id),
+                )
+            )
+
+        query_filter = models.Filter(must=must_conditions)
         search_results = qs.search(
             vector=query_vector, limit=request.top_k, query_filter=query_filter
         )
         return [
-            {"text": point.payload["text"], "score": point.score}
+            {
+                "text": point.payload["text"],
+                "score": point.score,
+                "source": point.payload.get("source", "Unknown"),
+                "page": point.payload.get("page", 0),
+                "book_id": point.payload.get("book_id", "Unknown"),
+            }
             for point in search_results
         ]
     except Exception:

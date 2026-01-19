@@ -54,32 +54,34 @@ def ingest_document_task(
         if not file_content:
             return {"error": "No file content or file_key provided"}
 
-        text = load_pdf(io.BytesIO(file_content))
-        chunks = chunk_text(text)
+        pages = load_pdf(io.BytesIO(file_content))
 
-        if not chunks:
+        if not pages:
             return {"message": "No text extracted from PDF"}
 
         qs = QdrantService(collection_name=collection_name)
 
         async def process_chunks():
             points = []
-            for chunk in chunks:
-                vector = await generate_embedding(chunk)
-                points.append(
-                    models.PointStruct(
-                        id=str(uuid.uuid4()),
-                        vector=vector,
-                        payload={
-                            "text": chunk,
-                            "source": filename,
-                            "book_id": book_id,
-                            "faculty_id": faculty_id,
-                            "department_id": department_id,
-                            "semester": semester,
-                        },
+            for page in pages:
+                chunks = chunk_text(page["text"])
+                for chunk in chunks:
+                    vector = await generate_embedding(chunk)
+                    points.append(
+                        models.PointStruct(
+                            id=str(uuid.uuid4()),
+                            vector=vector,
+                            payload={
+                                "text": chunk,
+                                "source": filename,
+                                "page": page["page"],
+                                "book_id": book_id,
+                                "faculty_id": faculty_id,
+                                "department_id": department_id,
+                                "semester": semester,
+                            },
+                        )
                     )
-                )
             if points:
                 qs.create_collection_if_not_exists(vector_size=len(points[0].vector))
                 qs.upsert_points(points)

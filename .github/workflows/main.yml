@@ -24,7 +24,10 @@ jobs:
       - name: Run basic tests
         run: |
           echo "Running basic tests..."
-          # pytest microservices/
+          export OPENAI_API_KEY=sk-test
+          export REDIS_URL=redis://localhost
+          export DATABASE_URL=sqlite:///test.db
+          pytest microservices/chat-service/tests/
 
       - name: Verify Alembic Migrations
         run: |

@@ -144,6 +144,8 @@ async def google_login(
             "role": user["role"],
             "email": user["email"],
             "auth_provider": user["auth_provider"],
+            "faculty": user.get("faculty"),
+            "semester": user.get("semester"),
         }
     )
     refresh_token = create_refresh_token(
@@ -201,6 +203,8 @@ async def login(
             "role": user["role"],
             "email": user["email"],
             "auth_provider": user["auth_provider"],
+            "faculty": user.get("faculty"),
+            "semester": user.get("semester"),
         }
     )
     refresh_token = create_refresh_token(
@@ -286,6 +290,8 @@ async def refresh_token(request: Request, refresh_token: str):
                 "role": user["role"],
                 "email": user["email"],
                 "auth_provider": user["auth_provider"],
+                "faculty": user.get("faculty"),
+                "semester": user.get("semester"),
             }
         )
         new_refresh_token = create_refresh_token(

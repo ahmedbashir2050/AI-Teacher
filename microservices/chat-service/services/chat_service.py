@@ -1,7 +1,15 @@
+import json
 import logging
 from uuid import UUID
 
 import httpx
+from core.audit import log_audit
+from core.metrics import (
+    ANSWERS_TOTAL,
+    HALLUCINATIONS_BLOCKED_TOTAL,
+    SIMILARITY_SCORE,
+    ANSWER_LATENCY,
+)
 from core.config import settings
 from rag.prompt import create_teacher_prompt
 from repository import chat_repository
@@ -49,29 +57,30 @@ async def handle_chat_message(
     semester_id: str,
     request_id: str = None,
 ) -> tuple:
-    # 1. Guardrails: Input Validation
-    if not user_message or len(user_message.strip()) == 0:
-        return "من فضلك أدخل سؤالاً صحيحاً.", session_id, None, ""
-
-    if len(user_message) > MAX_QUERY_LENGTH:
-        return (
-            f"عذراً، السؤال طويل جداً. يرجى اختصاره إلى أقل من {MAX_QUERY_LENGTH} حرفاً.",
+    with ANSWER_LATENCY.time():
+        return await _handle_chat_message_logic(
+            db,
+            user_id,
             session_id,
-            None,
-            "",
+            user_message,
+            collection_name,
+            faculty_id,
+            semester_id,
+            request_id,
         )
 
-    # Academic Safety: Detect cheating attempts
-    cheating_keywords = ["حل الامتحان", "إجابة كاملة", "حل لي هذا", "أعطني الأجوبة"]
-    if any(kw in user_message for kw in cheating_keywords):
-        return (
-            "أنا هنا لمساعدتك في فهم المادة وشرح المفاهيم بأسلوب تعليمي، وليس لحل الامتحانات أو الواجبات بشكل كامل. كيف يمكنني مساعدتك في شرح نقطة معينة؟",
-            session_id,
-            None,
-            "",
-        )
 
-    # 2. Get/Create Session
+async def _handle_chat_message_logic(
+    db: Session,
+    user_id: str,
+    session_id: UUID | None,
+    user_message: str,
+    collection_name: str,
+    faculty_id: str,
+    semester_id: str,
+    request_id: str = None,
+) -> tuple:
+    # 1. Get/Create Session
     if session_id:
         chat_session = chat_repository.get_chat_session(db, session_id)
         if not chat_session or str(chat_session.user_id) != user_id:
@@ -81,6 +90,34 @@ async def handle_chat_message(
     else:
         chat_session = chat_repository.create_chat_session(
             db, user_id, collection_name, faculty_id, semester_id
+        )
+
+    # 2. Guardrails: Input Validation
+    if not user_message or len(user_message.strip()) == 0:
+        return "من فضلك أدخل سؤالاً صحيحاً.", chat_session.id, None, "", {}, {}, None
+
+    if len(user_message) > MAX_QUERY_LENGTH:
+        return (
+            f"عذراً، السؤال طويل جداً. يرجى اختصاره إلى أقل من {MAX_QUERY_LENGTH} حرفاً.",
+            chat_session.id,
+            None,
+            "",
+            {},
+            {},
+            None
+        )
+
+    # Academic Safety: Detect cheating attempts
+    cheating_keywords = ["حل الامتحان", "إجابة كاملة", "حل لي هذا", "أعطني الأجوبة"]
+    if any(kw in user_message for kw in cheating_keywords):
+        return (
+            "أنا هنا لمساعدتك في فهم المادة وشرح المفاهيم بأسلوب تعليمي، وليس لحل الامتحانات أو الواجبات بشكل كامل. كيف يمكنني مساعدتك في شرح نقطة معينة؟",
+            chat_session.id,
+            None,
+            "",
+            {},
+            {},
+            None
         )
 
     # 3. Memory Optimization: Get history and summary
@@ -135,15 +172,16 @@ async def handle_chat_message(
             ]
             if filtered_results:
                 max_score = max(r.get("score", 0) for r in filtered_results)
-                initial_chunks = [r["text"] for r in filtered_results]
-                # Re-ranking
-                relevant_chunks = await llm_service.rerank_results(
-                    rewritten_query, initial_chunks
-                )
+                SIMILARITY_SCORE.observe(max_score)
+                # Keep full objects for source attribution
+                relevant_chunks = filtered_results
         except Exception as e:
             logger.error(f"RAG service error: {e}", extra={"request_id": request_id})
 
     # 6. Generate Response with Structured Validation
+    source_info = {"book": "N/A", "page": "N/A"}
+    hallucination_detected = False
+
     if not relevant_chunks and intent not in ["GENERAL"]:
         assistant_message = "عذراً، هذا الموضوع غير مغطى في الكتاب المقرر المتاح لي حالياً. أنا مصمم للمساعدة في محتوى المنهج الدراسي فقط لضمان دقة المعلومات."
     else:
@@ -157,33 +195,73 @@ async def handle_chat_message(
         )
 
         # Intelligent Caching for Responses
-        assistant_message = await llm_service.get_cached_response(
+        cached_resp = await llm_service.get_cached_response(
             faculty_id, semester_id, user_message
         )
-        if assistant_message:
+        if cached_resp:
             cache_used = True
+            try:
+                resp_json = json.loads(cached_resp)
+                assistant_message = resp_json.get("answer", "")
+                source_info = resp_json.get("source", source_info)
+            except:
+                assistant_message = cached_resp
         else:
-            assistant_message = await llm_service.get_chat_completion_with_validation(
-                prompt_messages
+            context_text = "\n".join([c["text"] for c in relevant_chunks])
+            resp_data = await llm_service.get_chat_completion_with_validation(
+                prompt_messages, context=context_text
             )
-            await llm_service.cache_response(
-                faculty_id, semester_id, user_message, assistant_message
-            )
+            assistant_message = resp_data.get("answer", "")
+            source_info = resp_data.get("source", source_info)
+            hallucination_detected = resp_data.get("hallucination", False)
+
+            if not hallucination_detected:
+                await llm_service.cache_response(
+                    faculty_id, semester_id, user_message, json.dumps(resp_data)
+                )
 
     # 7. AI Quality Evaluation Logging
-    quality_flag = (
-        "PASS"
-        if (relevant_chunks or intent == "GENERAL") and len(assistant_message) > 20
-        else "FAIL"
-    )
+    quality_flag = "PASS"
+    if hallucination_detected:
+        quality_flag = "HALLUCINATION"
+        HALLUCINATIONS_BLOCKED_TOTAL.inc()
+    elif (not relevant_chunks and intent != "GENERAL") or len(assistant_message) < 20:
+        quality_flag = "FAIL"
+
+    ANSWERS_TOTAL.labels(faculty_id=faculty_id, status=quality_flag).inc()
+
     logger.info(
-        f"AI_QUALITY_LOG: req={request_id} intent={intent} rag_score={max_score} cache={cache_used} resp_len={len(assistant_message)} flag={quality_flag}"
+        f"AI_QUALITY_LOG: req={request_id} intent={intent} rag_score={max_score} cache={cache_used} "
+        f"resp_len={len(assistant_message)} flag={quality_flag} source={source_info}"
     )
 
-    # 8. Save messages
+    if hallucination_detected:
+        log_audit(
+            user_id,
+            "hallucination_blocked",
+            "chat_message",
+            metadata={
+                "question": user_message,
+                "answer": assistant_message,
+                "rag_score": max_score,
+            },
+            request_id=request_id,
+        )
+
+    # 8. Save messages and Audit Log
     chat_repository.create_chat_message(db, chat_session.id, "user", user_message)
     chat_repository.create_chat_message(
         db, chat_session.id, "assistant", assistant_message
+    )
+
+    audit_log = chat_repository.create_answer_audit_log(
+        db,
+        user_id=user_id,
+        session_id=chat_session.id,
+        question_text=user_message,
+        ai_answer=assistant_message,
+        source_info=source_info,
+        book_id=relevant_chunks[0].get("book_id") if relevant_chunks else None,
     )
 
     # Prepare background task info (summarization)
@@ -197,9 +275,18 @@ async def handle_chat_message(
         "cache_used": cache_used,
         "relevant_chunks_count": len(relevant_chunks),
         "quality_flag": quality_flag,
+        "source": source_info,
     }
 
-    return assistant_message, chat_session.id, learning_summary, history_delta, metadata
+    return (
+        assistant_message,
+        chat_session.id,
+        learning_summary,
+        history_delta,
+        metadata,
+        source_info,
+        audit_log.id,
+    )
 
 
 async def update_learning_summary_task(

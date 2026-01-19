@@ -1,6 +1,6 @@
 import uuid
 
-import aioredis
+import redis.asyncio as aioredis
 from api.chat import router as chat_router
 from core.config import settings
 from core.observability import instrument_app, setup_logging, setup_tracing
