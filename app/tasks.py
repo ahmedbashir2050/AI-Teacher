@@ -1,15 +1,18 @@
+import io
+import uuid
+
+import sentry_sdk
+from qdrant_client import models
+
 from app.core.celery_worker import celery_app
-from app.rag.loader import load_pdf
+from app.core.logging import get_logger
 from app.rag.chunker import chunk_text
 from app.rag.embeddings import generate_embedding
+from app.rag.loader import load_pdf
 from app.services.qdrant_service import qdrant_service
-from qdrant_client import models
-from app.core.logging import get_logger
-import sentry_sdk
-import uuid
-import io
 
 logger = get_logger(__name__)
+
 
 @celery_app.task(name="tasks.process_document")
 def process_document_task(file_content: bytes, filename: str):
@@ -30,11 +33,13 @@ def process_document_task(file_content: bytes, filename: str):
         vector_size = len(first_vector)
         qdrant_service.create_collection_if_not_exists(vector_size=vector_size)
 
-        points.append(models.PointStruct(
-            id=str(uuid.uuid4()),
-            vector=first_vector,
-            payload={"text": chunks[0], "source": filename}
-        ))
+        points.append(
+            models.PointStruct(
+                id=str(uuid.uuid4()),
+                vector=first_vector,
+                payload={"text": chunks[0], "source": filename},
+            )
+        )
 
         for i in range(1, len(chunks)):
             chunk = chunks[i]
@@ -42,7 +47,7 @@ def process_document_task(file_content: bytes, filename: str):
             point = models.PointStruct(
                 id=str(uuid.uuid4()),
                 vector=vector,
-                payload={"text": chunk, "source": filename}
+                payload={"text": chunk, "source": filename},
             )
             points.append(point)
 

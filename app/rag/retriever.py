@@ -1,6 +1,7 @@
 from app.rag.embeddings import generate_embedding
 from app.services.qdrant_service import qdrant_service
 
+
 def retrieve_relevant_chunks(query: str, top_k: int = 5) -> list[str]:
     """
     Retrieves the most relevant text chunks for a given query.

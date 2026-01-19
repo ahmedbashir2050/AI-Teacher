@@ -1,23 +1,30 @@
-from sqlalchemy import Column, String, ForeignKey, Text, Integer, JSON
-from sqlalchemy.dialects.postgresql import UUID
 from db.base import BaseModel
+from sqlalchemy import JSON, Column, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+
 
 class Exam(BaseModel):
-    __tablename__ = 'exams'
+    __tablename__ = "exams"
     title = Column(String(255), nullable=False)
     course_id = Column(UUID(as_uuid=True), index=True, nullable=False)
     creator_id = Column(UUID(as_uuid=True), index=True, nullable=False)
 
+
 class Question(BaseModel):
-    __tablename__ = 'questions'
-    exam_id = Column(UUID(as_uuid=True), ForeignKey('exams.id'), index=True, nullable=False)
+    __tablename__ = "questions"
+    exam_id = Column(
+        UUID(as_uuid=True), ForeignKey("exams.id"), index=True, nullable=False
+    )
     content = Column(Text, nullable=False)
-    options = Column(JSON) # For multiple choice
+    options = Column(JSON)  # For multiple choice
     correct_answer = Column(Text)
 
+
 class ExamAttempt(BaseModel):
-    __tablename__ = 'exam_attempts'
-    exam_id = Column(UUID(as_uuid=True), ForeignKey('exams.id'), index=True, nullable=False)
+    __tablename__ = "exam_attempts"
+    exam_id = Column(
+        UUID(as_uuid=True), ForeignKey("exams.id"), index=True, nullable=False
+    )
     user_id = Column(UUID(as_uuid=True), index=True, nullable=False)
     score = Column(Integer)
     answers = Column(JSON)

@@ -1,9 +1,10 @@
-import logging
 import json
+import logging
 import time
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger("audit")
+
 
 def log_audit(
     user_id: str,
@@ -12,7 +13,7 @@ def log_audit(
     resource_id: Optional[str] = None,
     status: str = "success",
     metadata: Optional[Dict[str, Any]] = None,
-    request_id: Optional[str] = None
+    request_id: Optional[str] = None,
 ):
     """
     Standardized audit logging for production security and compliance.
@@ -27,6 +28,6 @@ def log_audit(
         "resource_id": resource_id,
         "status": status,
         "metadata": metadata or {},
-        "request_id": request_id
+        "request_id": request_id,
     }
     logger.info(f"AUDIT_EVENT: {json.dumps(audit_entry)}")

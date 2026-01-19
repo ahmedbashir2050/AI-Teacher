@@ -1,6 +1,8 @@
-import redis
-from app.config import settings
 import json
+
+import redis
+
+from app.config import settings
 
 # --- Redis Cache ---
 try:
@@ -11,6 +13,7 @@ except redis.exceptions.ConnectionError as e:
     print(f"Could not connect to Redis: {e}")
     redis_client = None
 
+
 def set_cache(key: str, value: any, ttl: int = 3600):
     """
     Sets a value in the Redis cache.
@@ -20,6 +23,7 @@ def set_cache(key: str, value: any, ttl: int = 3600):
             redis_client.set(key, json.dumps(value), ex=ttl)
         except Exception as e:
             print(f"Error setting cache for key '{key}': {e}")
+
 
 def get_cache(key: str) -> any:
     """

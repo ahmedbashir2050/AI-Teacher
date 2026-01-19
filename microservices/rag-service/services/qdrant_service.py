@@ -1,10 +1,12 @@
-from qdrant_client import QdrantClient, models
-from core.config import settings
 import logging
+
+from core.config import settings
+from qdrant_client import QdrantClient, models
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class QdrantService:
     def __init__(self, collection_name: str = "ai-teacher"):
@@ -15,7 +17,9 @@ class QdrantService:
         self.client = QdrantClient(url=settings.QDRANT_URL)
         self.collection_name = collection_name
 
-    def create_collection_if_not_exists(self, vector_size: int, distance=models.Distance.COSINE):
+    def create_collection_if_not_exists(
+        self, vector_size: int, distance=models.Distance.COSINE
+    ):
         """
         Creates a new collection in Qdrant if it doesn't already exist.
         """
@@ -24,12 +28,14 @@ class QdrantService:
             logger.info(f"Collection '{self.collection_name}' already exists.")
             # You might want to add a check here to ensure the vector size matches
         except Exception:
-            logger.info(f"Collection '{self.collection_name}' not found. Creating new collection with sharding.")
+            logger.info(
+                f"Collection '{self.collection_name}' not found. Creating new collection with sharding."
+            )
             # Production-grade: Enable sharding and replication
             self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=models.VectorParams(size=vector_size, distance=distance),
-                shard_number=4,       # Shard across 4 nodes/processes
+                shard_number=4,  # Shard across 4 nodes/processes
                 replication_factor=2,  # Maintain 2 copies for high availability
                 write_consistency_factor=1,
             )
@@ -43,28 +49,35 @@ class QdrantService:
             logger.warning("Upsert operation called with no points.")
             return
 
-        logger.info(f"Upserting {len(points)} points into collection '{self.collection_name}'.")
+        logger.info(
+            f"Upserting {len(points)} points into collection '{self.collection_name}'."
+        )
         self.client.upsert(
             collection_name=self.collection_name,
             points=points,
-            wait=True  # Wait for the operation to complete
+            wait=True,  # Wait for the operation to complete
         )
         logger.info("Upsert operation completed.")
 
-    def search(self, vector: list[float], limit: int = 5, query_filter: models.Filter = None) -> list[models.ScoredPoint]:
+    def search(
+        self, vector: list[float], limit: int = 5, query_filter: models.Filter = None
+    ) -> list[models.ScoredPoint]:
         """
         Performs a similarity search for a given vector.
         """
-        logger.info(f"Performing search in '{self.collection_name}' with a vector of size {len(vector)}.")
+        logger.info(
+            f"Performing search in '{self.collection_name}' with a vector of size {len(vector)}."
+        )
         search_result = self.client.search(
             collection_name=self.collection_name,
             query_vector=vector,
             limit=limit,
             query_filter=query_filter,
-            with_payload=True  # Ensure the payload (the text) is returned
+            with_payload=True,  # Ensure the payload (the text) is returned
         )
         logger.info(f"Search found {len(search_result)} results.")
         return search_result
+
 
 # Singleton instance
 qdrant_service = QdrantService()

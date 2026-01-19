@@ -1,6 +1,11 @@
 from app.models.chat import ChatMessage
 
-def create_teacher_prompt(retrieved_context: list[str], user_question: str, chat_history: list['ChatMessage'] = None) -> str:
+
+def create_teacher_prompt(
+    retrieved_context: list[str],
+    user_question: str,
+    chat_history: list["ChatMessage"] = None,
+) -> str:
     """
     Creates the final prompt for the LLM using the mandatory Arabic template.
     """

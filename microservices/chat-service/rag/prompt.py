@@ -1,8 +1,19 @@
-def create_teacher_prompt(retrieved_context: list[str], user_question: str, chat_history: list = None, learning_summary: str = None, intent: str = "GENERAL", mode: str = "UNDERSTANDING") -> list[dict]:
+def create_teacher_prompt(
+    retrieved_context: list[str],
+    user_question: str,
+    chat_history: list = None,
+    learning_summary: str = None,
+    intent: str = "GENERAL",
+    mode: str = "UNDERSTANDING",
+) -> list[dict]:
     """
     Creates a strict, production-grade deterministic prompt for the AI Tutor.
     """
-    context_str = "\n\n---\n\n".join(retrieved_context) if retrieved_context else "لا يوجد محتوى مرجعي متاح."
+    context_str = (
+        "\n\n---\n\n".join(retrieved_context)
+        if retrieved_context
+        else "لا يوجد محتوى مرجعي متاح."
+    )
 
     system_instructions = f"""
 ROLE: You are "The Intelligent Professor" (الأستاذ الذكي), a senior academic at the Open University of Sudan.
@@ -36,8 +47,10 @@ DETECTED INTENT: {intent}
     ]
 
     if chat_history:
-        for msg in chat_history[-5:]: # Keep last 5 turns for context
-            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        for msg in chat_history[-5:]:  # Keep last 5 turns for context
+            messages.append(
+                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+            )
 
     user_content = f"""
 المحتوى المرجعي:

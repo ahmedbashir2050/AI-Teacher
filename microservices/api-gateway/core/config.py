@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
     EXAM_SERVICE_URL: str = "http://exam-service:8000"
 
     class Config:
-        extra = 'ignore'
+        extra = "ignore"
+
 
 settings = Settings()

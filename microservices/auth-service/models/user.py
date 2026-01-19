@@ -1,14 +1,17 @@
 import enum
-from sqlalchemy import Column, String, Boolean, Enum
+
 from db.base import BaseModel
+from sqlalchemy import Boolean, Column, Enum, String
+
 
 class RoleEnum(str, enum.Enum):
     ADMIN = "admin"
     ACADEMIC = "academic"
     STUDENT = "student"
 
+
 class User(BaseModel):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)

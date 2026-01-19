@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
-from app.models.user import User, Role as UserRole
+
 from app.core.hashing import get_password_hash
+from app.models.user import Role as UserRole
+from app.models.user import User
+
 
 def create_user(db: Session, username: str, password: str, role: UserRole) -> User:
     db_user = User(
@@ -12,6 +15,7 @@ def create_user(db: Session, username: str, password: str, role: UserRole) -> Us
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 def get_user_by_email(db: Session, email: str) -> User:
     return db.query(User).filter(User.email == email).first()

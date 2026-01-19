@@ -1,31 +1,42 @@
-from fastapi import APIRouter, HTTPException, Depends
-from app.models.requests import ExamRequest, ExamSubmissionRequest
-from app.models.responses import ExamResponse, ExamQuestion, ExamResultResponse
-from app.services import exam_service
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
 from app.core.security import STUDENT_ACCESS
 from app.db.session import get_db
-from sqlalchemy.orm import Session
+from app.models.requests import ExamRequest, ExamSubmissionRequest
+from app.models.responses import ExamQuestion, ExamResponse, ExamResultResponse
 from app.models.user import User
 from app.repository import exam_repository
+from app.services import exam_service
 
 router = APIRouter()
 
+
 @router.post("/exam", response_model=ExamResponse)
-async def generate_exam(request: ExamRequest, db: Session = Depends(get_db), current_user: User = Depends(STUDENT_ACCESS)):
+async def generate_exam(
+    request: ExamRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(STUDENT_ACCESS),
+):
     """
     Generates a university-style exam from the curriculum content and stores it in the database.
     """
     db_exam = exam_service.generate_and_store_exam(db, request)
 
     if not db_exam:
-        raise HTTPException(status_code=500, detail="Failed to generate or store the exam.")
+        raise HTTPException(
+            status_code=500, detail="Failed to generate or store the exam."
+        )
 
-    questions = [ExamQuestion(
-        question_type=q.question_type.value,
-        question=q.question_text,
-        options=q.options,
-        correct_answer=q.correct_answer,
-    ) for q in db_exam.questions]
+    questions = [
+        ExamQuestion(
+            question_type=q.question_type.value,
+            question=q.question_text,
+            options=q.options,
+            correct_answer=q.correct_answer,
+        )
+        for q in db_exam.questions
+    ]
 
     return ExamResponse(
         exam_id=db_exam.id,
@@ -33,8 +44,14 @@ async def generate_exam(request: ExamRequest, db: Session = Depends(get_db), cur
         questions=questions,
     )
 
+
 @router.post("/exam/{exam_id}/submit", response_model=ExamResultResponse)
-async def submit_exam(exam_id: int, submission: ExamSubmissionRequest, db: Session = Depends(get_db), current_user: User = Depends(STUDENT_ACCESS)):
+async def submit_exam(
+    exam_id: int,
+    submission: ExamSubmissionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(STUDENT_ACCESS),
+):
     """
     Submits a student's answers for an exam and returns the score.
     """
@@ -50,7 +67,9 @@ async def submit_exam(exam_id: int, submission: ExamSubmissionRequest, db: Sessi
     db_attempt = exam_repository.create_exam_attempt(db, db_exam, current_user)
 
     for answer in submission.answers:
-        question = next((q for q in db_exam.questions if q.id == answer.question_id), None)
+        question = next(
+            (q for q in db_exam.questions if q.id == answer.question_id), None
+        )
         if question:
             is_correct = answer.answer_text == question.correct_answer
             if is_correct:

@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException
+
+from app.core.cache import get_cache, set_cache
+from app.core.security import STUDENT_ACCESS
 from app.models.requests import SummarizeRequest
 from app.models.responses import SummarizeResponse
 from app.rag.retriever import retrieve_relevant_chunks
 from app.services.llm_service import llm_service
-from app.core.security import STUDENT_ACCESS
-from app.core.cache import get_cache, set_cache
 
 router = APIRouter()
+
 
 def create_summarize_prompt(context: list[str], style: str) -> str:
     context_str = "\n\n".join(context)
@@ -26,8 +28,11 @@ Text:
 """
     return prompt.strip()
 
+
 @router.post("/summarize", response_model=SummarizeResponse)
-async def summarize_chapter(request: SummarizeRequest, current_user: dict = STUDENT_ACCESS):
+async def summarize_chapter(
+    request: SummarizeRequest, current_user: dict = STUDENT_ACCESS
+):
     """
     Generates a summary for a given chapter based on retrieved content.
     Caches the result to improve performance on subsequent requests.
@@ -39,10 +44,14 @@ async def summarize_chapter(request: SummarizeRequest, current_user: dict = STUD
 
     try:
         # Retrieve context for the entire chapter
-        relevant_chunks = retrieve_relevant_chunks(f"Summary of {request.chapter}", top_k=10)
+        relevant_chunks = retrieve_relevant_chunks(
+            f"Summary of {request.chapter}", top_k=10
+        )
 
         if not relevant_chunks:
-            return SummarizeResponse(summary="Could not find content for the specified chapter.")
+            return SummarizeResponse(
+                summary="Could not find content for the specified chapter."
+            )
 
         prompt = create_summarize_prompt(relevant_chunks, request.style)
         summary = llm_service.get_chat_completion(prompt)

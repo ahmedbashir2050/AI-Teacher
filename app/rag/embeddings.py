@@ -1,5 +1,6 @@
 from app.services.llm_service import llm_service
 
+
 def generate_embedding(text: str) -> list[float]:
     """
     Generates an embedding for a given text using the LLM service.

@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends, Header, Request
-from sqlalchemy.orm import Session
-from db.session import get_db
-from pydantic import BaseModel
-from models.user import UserProfile
 from core.audit import log_audit
+from db.session import get_db
+from fastapi import APIRouter, Depends, Header, Request
+from models.user import UserProfile
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter()
+
 
 class ProfileUpdate(BaseModel):
     full_name: str = None
     faculty_id: str = None
     department_id: str = None
     semester_id: str = None
+
 
 @router.get("/me")
 def get_my_profile(db: Session = Depends(get_db), x_user_id: str = Header(...)):
@@ -23,8 +25,14 @@ def get_my_profile(db: Session = Depends(get_db), x_user_id: str = Header(...)):
         db.refresh(profile)
     return profile
 
+
 @router.put("/me")
-def update_my_profile(request: Request, profile_in: ProfileUpdate, db: Session = Depends(get_db), x_user_id: str = Header(...)):
+def update_my_profile(
+    request: Request,
+    profile_in: ProfileUpdate,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+):
     request_id = getattr(request.state, "request_id", None)
     profile = db.query(UserProfile).filter(UserProfile.user_id == x_user_id).first()
     if not profile:
@@ -42,5 +50,12 @@ def update_my_profile(request: Request, profile_in: ProfileUpdate, db: Session =
 
     db.commit()
     db.refresh(profile)
-    log_audit(x_user_id, "update", "profile", resource_id=str(profile.id), metadata={"full_name": profile.full_name}, request_id=request_id)
+    log_audit(
+        x_user_id,
+        "update",
+        "profile",
+        resource_id=str(profile.id),
+        metadata={"full_name": profile.full_name},
+        request_id=request_id,
+    )
     return profile

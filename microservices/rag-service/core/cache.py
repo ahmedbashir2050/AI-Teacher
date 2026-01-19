@@ -1,21 +1,27 @@
+import functools
 import json
+
 import aioredis
 from core.config import settings
-import functools
 from pydantic import BaseModel
 
 redis = None
 
+
 async def get_redis():
     global redis
     if redis is None:
-        redis = await aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        redis = await aioredis.from_url(
+            settings.REDIS_URL, encoding="utf-8", decode_responses=True
+        )
     return redis
+
 
 def serialize_item(obj):
     if isinstance(obj, BaseModel):
-        return obj.dict() if hasattr(obj, 'dict') else obj.model_dump()
+        return obj.dict() if hasattr(obj, "dict") else obj.model_dump()
     return obj
+
 
 def cache_result(ttl: int = 300):
     def decorator(func):
@@ -41,5 +47,7 @@ def cache_result(ttl: int = 300):
 
             await r.set(key, json.dumps(serialized_result), ex=ttl)
             return result
+
         return wrapper
+
     return decorator

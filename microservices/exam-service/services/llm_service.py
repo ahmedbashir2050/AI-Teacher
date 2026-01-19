@@ -1,10 +1,12 @@
-from openai import AsyncOpenAI, APIError
-from core.config import settings
 import logging
+
+from core.config import settings
+from openai import APIError, AsyncOpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class LLMService:
     def __init__(self):
@@ -22,7 +24,7 @@ class LLMService:
             response = await self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.0, # Keep it deterministic for academic use cases
+                temperature=0.0,  # Keep it deterministic for academic use cases
             )
             content = response.choices[0].message.content
             logger.info("Successfully received chat completion")
@@ -34,7 +36,9 @@ class LLMService:
             logger.error(f"Unexpected error in get_chat_completion: {e}")
             return "عذراً، حدث خطأ غير متوقع."
 
-    async def get_embedding(self, text: str, model: str = "text-embedding-3-small") -> list[float]:
+    async def get_embedding(
+        self, text: str, model: str = "text-embedding-3-small"
+    ) -> list[float]:
         """
         Generates an embedding for a given text.
         """
@@ -52,6 +56,7 @@ class LLMService:
         except Exception as e:
             logger.error(f"Unexpected error in get_embedding: {e}")
             raise
+
 
 # Singleton instance
 llm_service = LLMService()

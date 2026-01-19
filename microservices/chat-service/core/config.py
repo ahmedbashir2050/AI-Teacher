@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     DATABASE_URL: str
     REDIS_URL: str
@@ -7,6 +8,7 @@ class Settings(BaseSettings):
     RAG_SERVICE_URL: str = "http://rag-service:8000"
 
     class Config:
-        extra = 'ignore'
+        extra = "ignore"
+
 
 settings = Settings()
