@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     JWT_AUDIENCE: str
     JWT_ISSUER: str
 
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_ISSUER: str = "https://accounts.google.com"
+
+    REDIS_URL: str = "redis://redis:6379/0"
+
     class Config:
         extra = "ignore"
 

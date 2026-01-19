@@ -5,7 +5,7 @@ import sys
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.sdk.resources import RESOURCE_ATTRIBUTES, Resource
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pythonjsonlogger import jsonlogger
@@ -29,7 +29,7 @@ def setup_logging(service_name: str):
 
 def setup_tracing(service_name: str, otlp_endpoint: str = "http://tempo:4317"):
     resource = Resource.create(
-        attributes={RESOURCE_ATTRIBUTES.SERVICE_NAME: service_name}
+        attributes={SERVICE_NAME: service_name}
     )
 
     provider = TracerProvider(resource=resource)
