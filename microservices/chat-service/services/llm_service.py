@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 
-import aioredis
+import redis.asyncio as aioredis
 from core.config import settings
 from openai import APIError, AsyncOpenAI
 
@@ -158,30 +158,70 @@ Keep it concise and objective.
             messages, model="gpt-4o-mini", temperature=0.0
         )
 
-    async def get_chat_completion_with_validation(self, messages: list[dict]) -> str:
+    async def check_groundedness(self, answer: str, context: str) -> bool:
         """
-        Enforces structured output validation after LLM call.
+        Checks if the generated answer is grounded in the provided context.
+        Returns True if grounded, False otherwise.
         """
-        response = await self.get_chat_completion(messages)
+        system_prompt = """
+You are a strict academic auditor.
+Verify if the following answer is fully supported by the provided context.
+If the answer contains information NOT in the context, or contradicts it, return 'FALSE'.
+If the answer is fully supported, return 'TRUE'.
+Only return 'TRUE' or 'FALSE'.
+"""
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Context: {context}\n\nAnswer: {answer}"},
+        ]
+        response = await self.get_chat_completion(
+            messages, model="gpt-4o-mini", temperature=0.0
+        )
+        return "TRUE" in response.upper()
 
-        # Validation rules
-        required_sections = ["التعريف:", "الشرح:", "مثال:", "ملخص:"]
-        is_academic = all(section in response for section in required_sections)
+    async def get_chat_completion_with_validation(
+        self, messages: list[dict], context: str = None
+    ) -> dict:
+        """
+        Enforces structured output validation and groundedness after LLM call.
+        Returns a dict with 'answer' and 'source' info.
+        """
+        # Request JSON output
+        messages.append(
+            {
+                "role": "system",
+                "content": "You MUST return a JSON object with 'answer' and 'source' (book, page) keys. Ensure the 'answer' follows the Arabic structure: التعريف، الشرح، مثال، ملخص.",
+            }
+        )
+        response_text = await self.get_chat_completion(
+            messages, model="gpt-4o", temperature=0.1
+        )
 
-        # If it's an academic response but missing sections, try one fix/retry
-        if not is_academic and "خارج المقرر" not in response and len(response) > 100:
-            logger.warning(
-                "Response failed structure validation. Retrying with explicit structure enforcement."
-            )
-            messages.append(
-                {
-                    "role": "system",
-                    "content": "يجب أن تلتزم بالهيكل المطلوب: التعريف، الشرح، مثال، ملخص.",
+        try:
+            # Simple cleanup for potential markdown blocks
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0]
+            result = json.loads(response_text)
+        except Exception:
+            # Fallback if LLM failed to return valid JSON
+            logger.error(f"Failed to parse LLM response as JSON: {response_text}")
+            return {
+                "answer": "عذراً، حدث خطأ في معالجة الإجابة بشكل صحيح.",
+                "source": {"book": "N/A", "page": "N/A"},
+            }
+
+        # Groundedness Check
+        if context and result.get("answer"):
+            is_grounded = await self.check_groundedness(result["answer"], context)
+            if not is_grounded:
+                logger.warning("Hallucination detected! Groundedness check failed.")
+                return {
+                    "answer": "عذراً، هذا السؤال خارج نطاق المحتوى المقرر حالياً. أنا مصمم للمساعدة في محتوى المنهج الدراسي فقط لضمان دقة المعلومات.",
+                    "source": {"book": "System", "page": "N/A"},
+                    "hallucination": True,
                 }
-            )
-            response = await self.get_chat_completion(messages)
 
-        return response
+        return result
 
     async def get_cached_rag_results(
         self, query: str, collection: str, faculty: str, semester: str

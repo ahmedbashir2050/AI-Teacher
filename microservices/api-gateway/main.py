@@ -1,7 +1,7 @@
 import uuid
 from contextlib import asynccontextmanager
 
-import aioredis
+import redis.asyncio as aioredis
 import httpx
 from core.config import settings
 from core.observability import instrument_app, setup_logging, setup_tracing
@@ -68,12 +68,17 @@ async def reverse_proxy(request: Request, url: str, user_data: dict = None):
         headers["X-User-Id"] = str(user_data.get("sub"))
         headers["X-User-Role"] = str(user_data.get("role"))
 
+    # Reuse body if it was already read by a dependency
+    content = getattr(request.state, "body", None)
+    if content is None:
+        content = request.stream()
+
     try:
         rp_req = http_client.build_request(
             request.method,
             url,
             headers=headers,
-            content=request.stream(),
+            content=content,
             params=request.query_params,
         )
         rp_resp = await http_client.send(rp_req, stream=True)
@@ -115,6 +120,48 @@ def enforce_role(allowed_roles: list[str]):
             raise HTTPException(status_code=403, detail="Forbidden: Insufficient permissions")
         return user_data
     return role_checker
+
+async def verify_enrollment(request: Request, user_data: dict = Depends(get_current_user)):
+    # Admins bypass enrollment checks
+    if user_data.get("role") in ["admin", "super_admin"]:
+        return user_data
+
+    # For chat and exam routes, we expect faculty_id and semester_id
+    # They can be in the body (JSON) or query params
+    target_faculty = None
+    target_semester = None
+
+    if request.method in ["POST", "PUT", "PATCH"]:
+        try:
+            # We must be careful not to consume the stream if we use it later.
+            # However, reverse_proxy uses request.stream().
+            # If we call request.json(), it consumes the stream.
+            # We can store the body in request.state to reuse it.
+            body_bytes = await request.body()
+            request.state.body = body_bytes
+            import json
+            body = json.loads(body_bytes)
+            target_faculty = body.get("faculty_id")
+            target_semester = body.get("semester_id")
+        except:
+            pass
+
+    if not target_faculty:
+        target_faculty = request.query_params.get("faculty_id")
+    if not target_semester:
+        target_semester = request.query_params.get("semester_id")
+
+    # If the request specifically targets a faculty/semester, it must match the user's
+    user_faculty = user_data.get("faculty")
+    user_semester = str(user_data.get("semester"))
+
+    if target_faculty and target_faculty != user_faculty:
+        raise HTTPException(status_code=403, detail=f"Not enrolled in faculty: {target_faculty}")
+
+    if target_semester and str(target_semester) != user_semester:
+        raise HTTPException(status_code=403, detail=f"Not enrolled in semester: {target_semester}")
+
+    return user_data
 
 
 @app.api_route(
@@ -198,7 +245,7 @@ async def user_route(
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )
 async def chat_route(
-    request: Request, path: str, user_data: dict = Depends(get_current_user)
+    request: Request, path: str, user_data: dict = Depends(verify_enrollment)
 ):
     url = f"{settings.CHAT_SERVICE_URL}/{path}"
     return await reverse_proxy(request, url, user_data=user_data)
@@ -232,8 +279,10 @@ async def rag_route(
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )
 async def exam_route(
-    request: Request, path: str, user_data: dict = Depends(enforce_role(["student", "teacher"]))
+    request: Request, path: str, user_data: dict = Depends(verify_enrollment)
 ):
+    # verify_enrollment also ensures the user is logged in.
+    # We might still want to enforce role student/teacher if it's not student-only.
     url = f"{settings.EXAM_SERVICE_URL}/{path}"
     return await reverse_proxy(request, url, user_data=user_data)
 

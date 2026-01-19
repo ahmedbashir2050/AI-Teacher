@@ -15,6 +15,8 @@ router = APIRouter()
 class ExamCreateRequest(BaseModel):
     course_id: str
     collection_name: str
+    faculty_id: str
+    semester_id: str
     mcq_count: int = 5
     theory_count: int = 2
 
@@ -41,6 +43,8 @@ async def generate_exam(
         x_user_id,
         request.course_id,
         request.collection_name,
+        request.faculty_id,
+        request.semester_id,
         request.mcq_count,
         request.theory_count,
         request_id,

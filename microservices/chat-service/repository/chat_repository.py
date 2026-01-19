@@ -1,7 +1,8 @@
+import json
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from models.chat import ChatMessage, ChatSession
+from models.chat import AnswerAuditLog, ChatMessage, ChatSession
 from sqlalchemy.orm import Session
 
 
@@ -82,5 +83,50 @@ def soft_delete_session(db: Session, session_id: UUID, user_id: str):
     if session:
         session.is_deleted = datetime.utcnow()
         db.commit()
+        return True
+    return False
+
+
+def create_answer_audit_log(
+    db: Session,
+    user_id: str,
+    session_id: UUID,
+    question_text: str,
+    ai_answer: str,
+    source_info: dict,
+    book_id: str = None,
+):
+    log_entry = AnswerAuditLog(
+        id=uuid4(),
+        user_id=user_id,
+        session_id=session_id,
+        book_id=book_id,
+        question_text=question_text,
+        ai_answer=ai_answer,
+        source_reference=json.dumps(source_info),
+        verified=False,
+    )
+    db.add(log_entry)
+    db.commit()
+    db.refresh(log_entry)
+    return log_entry
+
+
+def update_answer_feedback(db: Session, log_id: UUID, is_correct: bool):
+    log_entry = db.query(AnswerAuditLog).filter(AnswerAuditLog.id == log_id).first()
+    if log_entry:
+        log_entry.is_correct = is_correct
+        db.commit()
+        db.refresh(log_entry)
+        return True
+    return False
+
+
+def verify_answer(db: Session, log_id: UUID, verified: bool = True):
+    log_entry = db.query(AnswerAuditLog).filter(AnswerAuditLog.id == log_id).first()
+    if log_entry:
+        log_entry.verified = verified
+        db.commit()
+        db.refresh(log_entry)
         return True
     return False

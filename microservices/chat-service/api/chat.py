@@ -29,8 +29,15 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    message: str
+    answer: str
+    source: dict
     session_id: UUID
+    audit_log_id: Optional[UUID] = None
+
+
+class FeedbackRequest(BaseModel):
+    audit_log_id: UUID
+    is_correct: bool
 
 
 def get_user_id_key(request: Request):
@@ -96,6 +103,8 @@ async def chat(
         learning_summary,
         history_delta,
         metadata,
+        source_info,
+        audit_log_id,
     ) = await chat_service.handle_chat_message(
         db,
         user_id=x_user_id,
@@ -124,4 +133,49 @@ async def chat(
         metadata=metadata,
         request_id=request_id,
     )
-    return ChatResponse(message=assistant_message, session_id=session_id)
+    return ChatResponse(
+        answer=assistant_message,
+        source=source_info,
+        session_id=session_id,
+        audit_log_id=audit_log_id,
+    )
+
+
+@router.post("/feedback")
+async def student_feedback(
+    request: FeedbackRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+):
+    from core.metrics import STUDENT_FEEDBACK_TOTAL
+    from repository import chat_repository
+
+    success = chat_repository.update_answer_feedback(
+        db, request.audit_log_id, request.is_correct
+    )
+    if success:
+        STUDENT_FEEDBACK_TOTAL.labels(is_correct=str(request.is_correct)).inc()
+    if not success:
+        raise HTTPException(status_code=404, detail="Audit log not found")
+    return {"status": "success"}
+
+
+@router.post("/verify/{log_id}")
+async def admin_verify(
+    log_id: UUID,
+    verified: bool = True,
+    db: Session = Depends(get_db),
+    x_user_role: str = Header(...),
+):
+    if x_user_role not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from core.metrics import VERIFIED_ANSWERS_TOTAL
+    from repository import chat_repository
+
+    success = chat_repository.verify_answer(db, log_id, verified)
+    if success:
+        VERIFIED_ANSWERS_TOTAL.labels(is_verified=str(verified)).inc()
+    if not success:
+        raise HTTPException(status_code=404, detail="Audit log not found")
+    return {"status": "success"}

@@ -1,5 +1,5 @@
 def create_teacher_prompt(
-    retrieved_context: list[str],
+    retrieved_context: list[dict],
     user_question: str,
     chat_history: list = None,
     learning_summary: str = None,
@@ -9,9 +9,16 @@ def create_teacher_prompt(
     """
     Creates a strict, production-grade deterministic prompt for the AI Tutor.
     """
+    formatted_chunks = []
+    for i, chunk in enumerate(retrieved_context):
+        chunk_text = chunk.get("text", "")
+        source = chunk.get("source", "Unknown")
+        page = chunk.get("page", "N/A")
+        formatted_chunks.append(f"Chunk [{i}] (Source: {source}, Page: {page}):\n{chunk_text}")
+
     context_str = (
-        "\n\n---\n\n".join(retrieved_context)
-        if retrieved_context
+        "\n\n---\n\n".join(formatted_chunks)
+        if formatted_chunks
         else "لا يوجد محتوى مرجعي متاح."
     )
 
@@ -24,8 +31,9 @@ STRICT CONSTRAINTS:
 2. REFUSAL BEHAVIOR: If the reference content does not contain the answer, explicitly state: "هذا السؤال خارج نطاق المحتوى المقرر حالياً."
 3. LANGUAGE: Use formal Academic Arabic (اللغة العربية الفصحى الأكاديمية) exclusively.
 4. CITATION: Use internal citations like (كما ورد في المحتوى المرجعي...) for every major claim.
-5. PEDAGOGICAL POLICY: Explain concepts; DO NOT solve full exams or provide direct answers to homework without explanation.
-6. STRUCTURE: Every academic response MUST follow this exact schema:
+5. SOURCE ATTRIBUTION: You MUST identify the specific book and page number from the reference content used for your answer.
+6. PEDAGOGICAL POLICY: Explain concepts; DO NOT solve full exams or provide direct answers to homework without explanation.
+7. STRUCTURE: Every academic response MUST follow this exact schema:
    - التعريف: (Brief academic definition)
    - الشرح: (Detailed educational explanation)
    - مثال: (Illustrative example from the provided context)

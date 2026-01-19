@@ -1,5 +1,5 @@
 from db.base import BaseModel
-from sqlalchemy import Column, ForeignKey, String, Text
+from sqlalchemy import Boolean, Column, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 
@@ -20,3 +20,15 @@ class ChatMessage(BaseModel):
     )
     role = Column(String(50), nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
+
+
+class AnswerAuditLog(BaseModel):
+    __tablename__ = "answer_audit_logs"
+    user_id = Column(UUID(as_uuid=True), index=True, nullable=False)
+    session_id = Column(UUID(as_uuid=True), index=True)
+    book_id = Column(String(255), index=True)
+    question_text = Column(Text, nullable=False)
+    ai_answer = Column(Text, nullable=False)
+    source_reference = Column(Text)  # JSON string of source info
+    verified = Column(Boolean, default=False)
+    is_correct = Column(Boolean, nullable=True)  # student feedback
