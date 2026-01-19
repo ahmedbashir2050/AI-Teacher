@@ -10,6 +10,7 @@ os.environ["JWT_SECRET_KEY"] = "test-secret"
 os.environ["JWT_AUDIENCE"] = "test-audience"
 os.environ["JWT_ISSUER"] = "test-issuer"
 os.environ["GOOGLE_CLIENT_ID"] = "test-google-id"
+os.environ["USER_SERVICE_URL"] = "http://localhost:8001"
 
 # Add the service directory to sys.path
 sys.path.append(os.path.join(os.getcwd(), "microservices/auth-service"))
@@ -34,17 +35,19 @@ def test_google_login_success(mock_db):
         "email_verified": True
     }
 
-    mock_user = MagicMock()
-    mock_user.id = "550e8400-e29b-41d4-a716-446655440000"
-    mock_user.email = "test@example.com"
-    mock_user.role.value = "student"
-    mock_user.is_active = True
-    mock_user.auth_provider = "google"
+    mock_user = {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "email": "test@example.com",
+        "role": "student",
+        "is_active": True,
+        "auth_provider": "google",
+        "full_name": "Test User",
+        "avatar_url": "http://example.com/photo.jpg"
+    }
 
     with patch("api.auth.verify_google_token", return_value=mock_idinfo), \
-         patch("api.auth.user_repository.get_user_by_email", return_value=None), \
-         patch("api.auth.user_repository.create_google_user", return_value=mock_user), \
-         patch("api.auth.user_repository.update_last_login"):
+         patch("api.auth.user_service_client.get_user_by_email", return_value=None), \
+         patch("api.auth.user_service_client.create_user", return_value=mock_user):
 
         response = client.post("/auth/google", json={"id_token": "valid_token"})
 
@@ -77,14 +80,17 @@ def test_google_login_suspended_user(mock_db):
         "email_verified": True
     }
 
-    mock_user = MagicMock()
-    mock_user.id = "550e8400-e29b-41d4-a716-446655440001"
-    mock_user.email = "suspended@example.com"
-    mock_user.role.value = "student"
-    mock_user.is_active = False
+    mock_user = {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "email": "suspended@example.com",
+        "role": "student",
+        "is_active": False,
+        "auth_provider": "google",
+        "full_name": "Suspended User"
+    }
 
     with patch("api.auth.verify_google_token", return_value=mock_idinfo), \
-         patch("api.auth.user_repository.get_user_by_email", return_value=mock_user):
+         patch("api.auth.user_service_client.get_user_by_email", return_value=mock_user):
 
         response = client.post("/auth/google", json={"id_token": "valid_token"})
         assert response.status_code == 403

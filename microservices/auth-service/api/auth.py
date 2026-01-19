@@ -2,54 +2,48 @@ import redis.asyncio as redis
 from core.audit import log_audit
 from core.config import settings
 from core.google_auth import verify_google_token
-from core.security import create_access_token, create_refresh_token, verify_password
-from db.session import get_db
+from core.security import create_access_token, create_refresh_token, verify_password, get_password_hash
+from core.user_client import user_service_client
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt
-from models.user import RoleEnum
 from pydantic import BaseModel, EmailStr
-from repository import user_repository
-from sqlalchemy.orm import Session
+from typing import Optional
 
 router = APIRouter()
 
-
 class UserCreate(BaseModel):
     email: EmailStr
-    username: str
     password: str
-
+    full_name: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str
     email: str
-    username: str | None = None
-    full_name: str | None = None
-    avatar_url: str | None = None
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     auth_provider: str
     role: str
 
     class Config:
         from_attributes = True
 
-
 class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
-
 class GoogleLogin(BaseModel):
     id_token: str
-
 
 @router.post(
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
-def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
+async def register(request: Request, user_in: UserCreate):
     request_id = getattr(request.state, "request_id", None)
-    if user_repository.get_user_by_email(db, email=user_in.email):
+
+    existing_user = await user_service_client.get_user_by_email(user_in.email)
+    if existing_user:
         log_audit(
             "anonymous",
             "register",
@@ -59,19 +53,22 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
             request_id=request_id,
         )
         raise HTTPException(status_code=400, detail="Email already registered")
-    if user_repository.get_user_by_username(db, username=user_in.username):
-        raise HTTPException(status_code=400, detail="Username already registered")
 
-    user = user_repository.create_user(
-        db, email=user_in.email, username=user_in.username, password=user_in.password
-    )
-    log_audit(str(user.id), "register", "user", status="success", request_id=request_id)
+    user_data = {
+        "email": user_in.email,
+        "full_name": user_in.full_name,
+        "role": "student",
+        "auth_provider": "password",
+        "hashed_password": get_password_hash(user_in.password)
+    }
+
+    user = await user_service_client.create_user(user_data)
+    log_audit(str(user["id"]), "register", "user", status="success", request_id=request_id)
     return user
-
 
 @router.post("/google", response_model=Token)
 async def google_login(
-    request: Request, login_data: GoogleLogin, db: Session = Depends(get_db)
+    request: Request, login_data: GoogleLogin
 ):
     request_id = getattr(request.state, "request_id", None)
 
@@ -90,18 +87,26 @@ async def google_login(
         raise e
 
     email = idinfo.get("email")
-    full_name = idinfo.get("name")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email missing from Google token")
+
+    full_name = idinfo.get("name") or idinfo.get("given_name", "Google User")
     avatar_url = idinfo.get("picture")
 
     # 2. Fetch or Create User
-    user = user_repository.get_user_by_email(db, email=email)
+    user = await user_service_client.get_user_by_email(email)
 
     if not user:
-        user = user_repository.create_google_user(
-            db, email=email, full_name=full_name, avatar_url=avatar_url
-        )
+        user_data = {
+            "email": email,
+            "full_name": full_name,
+            "avatar_url": avatar_url,
+            "role": "student",
+            "auth_provider": "google"
+        }
+        user = await user_service_client.create_user(user_data)
         log_audit(
-            user_id=str(user.id),
+            user_id=str(user["id"]),
             action="USER_CREATED_FROM_GOOGLE",
             resource="user",
             status="success",
@@ -109,10 +114,21 @@ async def google_login(
             request_id=request_id,
         )
     else:
+        # Secure Account Linking: If user exists, we trust Google's verified email
+        update_data = {}
+        if not user.get("full_name") and full_name:
+            update_data["full_name"] = full_name
+        if not user.get("avatar_url") and avatar_url:
+            update_data["avatar_url"] = avatar_url
+
+        if update_data:
+            await user_service_client.update_user(user["id"], update_data)
+            user.update(update_data)
+
         # Check if user is active
-        if not user.is_active:
+        if not user.get("is_active"):
             log_audit(
-                user_id=str(user.id),
+                user_id=str(user["id"]),
                 action="GOOGLE_LOGIN_FAILURE",
                 resource="user",
                 status="failure",
@@ -121,33 +137,25 @@ async def google_login(
             )
             raise HTTPException(status_code=403, detail="Account suspended")
 
-        # Ensure auth provider is updated if linking is allowed
-        if user.auth_provider != "google":
-            user.auth_provider = "google"
-            db.commit()
-
-    # 3. Update last login
-    user_repository.update_last_login(db, user)
-
-    # 4. Issue Tokens
+    # 3. Issue Tokens
     access_token = create_access_token(
         data={
-            "sub": str(user.id),
-            "role": user.role.value,
-            "email": user.email,
-            "auth_provider": user.auth_provider,
+            "sub": str(user["id"]),
+            "role": user["role"],
+            "email": user["email"],
+            "auth_provider": user["auth_provider"],
         }
     )
     refresh_token = create_refresh_token(
         data={
-            "sub": str(user.id),
-            "email": user.email,
-            "auth_provider": user.auth_provider,
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "auth_provider": user["auth_provider"],
         }
     )
 
     log_audit(
-        user_id=str(user.id),
+        user_id=str(user["id"]),
         action="GOOGLE_LOGIN_SUCCESS",
         resource="user",
         status="success",
@@ -161,19 +169,15 @@ async def google_login(
         "token_type": "bearer",
     }
 
-
 @router.post("/login", response_model=Token)
-def login(
+async def login(
     request: Request,
-    db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ):
     request_id = getattr(request.state, "request_id", None)
-    user = user_repository.get_user_by_username(db, username=form_data.username)
-    if not user:
-        user = user_repository.get_user_by_email(db, email=form_data.username)
+    user = await user_service_client.get_user_by_email(form_data.username)
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not user.get("hashed_password") or not verify_password(form_data.password, user["hashed_password"]):
         log_audit(
             form_data.username,
             "login",
@@ -184,27 +188,30 @@ def login(
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if not user.get("is_active"):
+        raise HTTPException(status_code=403, detail="Account suspended")
+
     access_token = create_access_token(
         data={
-            "sub": str(user.id),
-            "role": user.role.value,
-            "email": user.email,
-            "auth_provider": user.auth_provider,
+            "sub": str(user["id"]),
+            "role": user["role"],
+            "email": user["email"],
+            "auth_provider": user["auth_provider"],
         }
     )
     refresh_token = create_refresh_token(
         data={
-            "sub": str(user.id),
-            "email": user.email,
-            "auth_provider": user.auth_provider,
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "auth_provider": user["auth_provider"],
         }
     )
 
-    log_audit(str(user.id), "login", "user", status="success", request_id=request_id)
+    log_audit(str(user["id"]), "login", "user", status="success", request_id=request_id)
 
     return {
         "access_token": access_token,
@@ -212,9 +219,7 @@ def login(
         "token_type": "bearer",
     }
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
-
 
 async def get_redis():
     r = await redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -222,7 +227,6 @@ async def get_redis():
         yield r
     finally:
         await r.close()
-
 
 @router.post("/logout")
 async def logout(
@@ -257,9 +261,8 @@ async def logout(
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-
 @router.post("/refresh", response_model=Token)
-def refresh_token(request: Request, refresh_token: str, db: Session = Depends(get_db)):
+async def refresh_token(request: Request, refresh_token: str):
     request_id = getattr(request.state, "request_id", None)
     try:
         payload = jwt.decode(
@@ -273,32 +276,28 @@ def refresh_token(request: Request, refresh_token: str, db: Session = Depends(ge
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-        user = (
-            db.query(user_repository.User)
-            .filter(user_repository.User.id == user_id)
-            .first()
-        )
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+        user = await user_service_client.get_user_by_id(user_id)
+        if not user or not user.get("is_active"):
+            raise HTTPException(status_code=401, detail="User not found or inactive")
 
         access_token = create_access_token(
             data={
-                "sub": str(user.id),
-                "role": user.role.value,
-                "email": user.email,
-                "auth_provider": user.auth_provider,
+                "sub": str(user["id"]),
+                "role": user["role"],
+                "email": user["email"],
+                "auth_provider": user["auth_provider"],
             }
         )
         new_refresh_token = create_refresh_token(
             data={
-                "sub": str(user.id),
-                "email": user.email,
-                "auth_provider": user.auth_provider,
+                "sub": str(user["id"]),
+                "email": user["email"],
+                "auth_provider": user["auth_provider"],
             }
         )
 
         log_audit(
-            str(user.id), "refresh", "token", status="success", request_id=request_id
+            str(user["id"]), "refresh", "token", status="success", request_id=request_id
         )
 
         return {
@@ -308,37 +307,3 @@ def refresh_token(request: Request, refresh_token: str, db: Session = Depends(ge
         }
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-
-
-class RoleUpdate(BaseModel):
-    user_id: str
-    new_role: RoleEnum
-
-
-@router.put("/roles", status_code=status.HTTP_200_OK)
-async def update_user_role(
-    request: Request, update: RoleUpdate, db: Session = Depends(get_db)
-):
-    # In a real app, this would be protected by ADMIN role
-    request_id = getattr(request.state, "request_id", None)
-    user = (
-        db.query(user_repository.User)
-        .filter(user_repository.User.id == update.user_id)
-        .first()
-    )
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    old_role = user.role.value
-    user.role = update.new_role
-    db.commit()
-
-    log_audit(
-        user_id="admin",  # Assume admin caller
-        action="update_role",
-        resource="user",
-        resource_id=update.user_id,
-        metadata={"old_role": old_role, "new_role": update.new_role.value},
-        request_id=request_id,
-    )
-    return {"message": "Role updated successfully"}

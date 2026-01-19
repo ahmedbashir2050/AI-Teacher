@@ -102,10 +102,19 @@ def get_current_user(request: Request):
             algorithms=[settings.JWT_ALGORITHM],
             audience=settings.JWT_AUDIENCE,
             issuer=settings.JWT_ISSUER,
+            options={"leeway": 60},  # 60 seconds clock skew tolerance
         )
         return payload
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+def enforce_role(allowed_roles: list[str]):
+    def role_checker(user_data: dict = Depends(get_current_user)):
+        role = user_data.get("role")
+        if role not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Forbidden: Insufficient permissions")
+        return user_data
+    return role_checker
 
 
 @app.api_route(
@@ -123,6 +132,18 @@ def get_current_user(request: Request):
 async def auth_route(request: Request, path: str):
     url = f"{settings.AUTH_SERVICE_URL}/auth/{path}"
     return await reverse_proxy(request, url)
+
+
+@app.api_route(
+    "/api/v1/admin/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def admin_route(
+    request: Request, path: str, user_data: dict = Depends(enforce_role(["admin"]))
+):
+    url = f"{settings.USER_SERVICE_URL}/admin/{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
 
 
 @app.api_route(
@@ -187,7 +208,7 @@ async def rag_route(
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )
 async def exam_route(
-    request: Request, path: str, user_data: dict = Depends(get_current_user)
+    request: Request, path: str, user_data: dict = Depends(enforce_role(["student", "teacher"]))
 ):
     url = f"{settings.EXAM_SERVICE_URL}/{path}"
     return await reverse_proxy(request, url, user_data=user_data)

@@ -2,16 +2,12 @@ import uuid
 
 from api.auth import router as auth_router
 from core.observability import instrument_app, setup_logging, setup_tracing
-from db.base import Base
-from db.session import engine
 from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Setup observability
 logger = setup_logging("auth-service")
 setup_tracing("auth-service")
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Auth Service", version="1.0.0")
 Instrumentator().instrument(app).expose(app)

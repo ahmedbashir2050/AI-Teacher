@@ -1,18 +1,14 @@
 import uuid
 
 from api.academics import router as academics_router
-from api.profiles import router as profiles_router
+from api.users import router as users_router
 from core.observability import instrument_app, setup_logging, setup_tracing
-from db.base import Base
-from db.session import engine
 from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Setup observability
 logger = setup_logging("user-service")
 setup_tracing("user-service")
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="User Service", version="1.0.0")
 Instrumentator().instrument(app).expose(app)
@@ -39,7 +35,7 @@ async def security_and_correlation_middleware(request: Request, call_next):
 
 
 app.include_router(academics_router, tags=["Academics"])
-app.include_router(profiles_router, prefix="/profiles", tags=["Profiles"])
+app.include_router(users_router, tags=["Users"])
 
 
 @app.get("/health")
