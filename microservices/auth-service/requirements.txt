@@ -13,3 +13,5 @@ opentelemetry-instrumentation-fastapi
 opentelemetry-exporter-otlp
 alembic
 redis
+google-auth
+requests

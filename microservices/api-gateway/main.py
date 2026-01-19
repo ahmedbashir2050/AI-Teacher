@@ -109,7 +109,16 @@ def get_current_user(request: Request):
 
 
 @app.api_route(
-    "/api/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], tags=["Auth"]
+    "/api/auth/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    tags=["Auth"],
+    dependencies=[Depends(RateLimiter(times=20, minutes=1))],
+)
+@app.api_route(
+    "/api/v1/auth/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    tags=["Auth"],
+    dependencies=[Depends(RateLimiter(times=20, minutes=1))],
 )
 async def auth_route(request: Request, path: str):
     url = f"{settings.AUTH_SERVICE_URL}/auth/{path}"
@@ -118,6 +127,11 @@ async def auth_route(request: Request, path: str):
 
 @app.api_route(
     "/api/users/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=100, minutes=1))],
+)
+@app.api_route(
+    "/api/v1/users/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE"],
     dependencies=[Depends(RateLimiter(times=100, minutes=1))],
 )
@@ -133,6 +147,11 @@ async def user_route(
     methods=["GET", "POST", "PUT", "DELETE"],
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )
+@app.api_route(
+    "/api/v1/chat/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
 async def chat_route(
     request: Request, path: str, user_data: dict = Depends(get_current_user)
 ):
@@ -145,6 +164,11 @@ async def chat_route(
     methods=["GET", "POST", "PUT", "DELETE"],
     dependencies=[Depends(RateLimiter(times=20, minutes=1))],
 )
+@app.api_route(
+    "/api/v1/rag/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=20, minutes=1))],
+)
 async def rag_route(
     request: Request, path: str, user_data: dict = Depends(get_current_user)
 ):
@@ -154,6 +178,11 @@ async def rag_route(
 
 @app.api_route(
     "/api/exams/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+@app.api_route(
+    "/api/v1/exams/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE"],
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )

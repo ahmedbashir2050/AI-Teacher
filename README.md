@@ -79,6 +79,17 @@ Ask a question based on the curriculum. Requires academic context.
     }
     ```
 
+### 5. Google Login
+Securely log in using your Google account.
+
+*   **Endpoint:** `POST /api/v1/auth/google`
+*   **Body (JSON):**
+    ```json
+    {
+      "id_token": "<google_id_token>"
+    }
+    ```
+
 ### 3. Generate an Exam
 Create a university-style exam with MCQ and Theory questions.
 

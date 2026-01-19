@@ -77,8 +77,8 @@ sequenceDiagram
 ### Core Microservices
 | Service | Responsibility | Key Endpoints | Data Store |
 | :--- | :--- | :--- | :--- |
-| **API Gateway** | RBAC, Rate Limiting, Versioning | `/v1/*` | Redis |
-| **Auth Service** | Identity, JWT, Role Management | `/login`, `/register`, `/logout` | PostgreSQL |
+| **API Gateway** | RBAC, Rate Limiting, Versioning | `/api/v1/*` | Redis |
+| **Auth Service** | Identity, JWT, Role Management | `/login`, `/register`, `/logout`, `/google` | PostgreSQL |
 | **User Service** | Profiles, Academic Hierarchy | `/me`, `/faculties`, `/courses` | PostgreSQL |
 | **Chat Service** | AI Tutoring, Learning Summary | `/chat`, `/session/{id}` | PostgreSQL |
 | **RAG Service** | Vector Search, Document Ingestion | `/search`, `/ingest` | Qdrant, PostgreSQL |
@@ -115,6 +115,7 @@ sequenceDiagram
 
 ### 4.2 Caching Strategy (Redis)
 - **Identity**: JWT Blacklist for immediate logout/revocation.
+- **OAuth**: Google ID Token verification integrated into the Auth Service.
 - **RAG**: Vector search results cached for 10 minutes to reduce LLM/Qdrant load.
 - **AI Responses**: Final tutor responses cached for 24h for common queries.
 
