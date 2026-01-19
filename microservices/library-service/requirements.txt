@@ -3,15 +3,8 @@ uvicorn[standard]
 sqlalchemy
 psycopg2-binary
 pydantic-settings
-qdrant-client
-openai
-pypdf
-langchain-text-splitters
-tiktoken
-langchain-openai
-celery[redis]
-prometheus-fastapi-instrumentator
 aioredis
+prometheus-fastapi-instrumentator
 python-json-logger
 opentelemetry-api
 opentelemetry-sdk
@@ -19,4 +12,8 @@ opentelemetry-instrumentation-fastapi
 opentelemetry-exporter-otlp
 alembic
 boto3
-botocore
+aioboto3
+python-multipart
+celery
+redis
+httpx

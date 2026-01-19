@@ -22,6 +22,7 @@ graph TD
         Gateway --> RAG[RAG Service]
         Gateway --> Exam[Exam Service]
         Gateway --> Notif[Notification Service]
+        Gateway --> Library[Library Service]
     end
 
     subgraph "Data Layer"
@@ -29,8 +30,10 @@ graph TD
         UserSvc --> UserDB[(PostgreSQL - User)]
         Chat --> ChatDB[(PostgreSQL - Chat)]
         Exam --> ExamDB[(PostgreSQL - Exam)]
+        Library --> LibraryDB[(PostgreSQL - Library)]
         RAG --> Qdrant[(Qdrant Vector DB)]
 
+        Storage[(S3/MinIO - Book PDFs)]
         Redis[(Redis - Cache/Tasks/Blacklist)]
     end
 
@@ -46,6 +49,7 @@ graph TD
     PgBouncer -.-> UserDB
     PgBouncer -.-> ChatDB
     PgBouncer -.-> ExamDB
+    PgBouncer -.-> LibraryDB
 ```
 
 ### 1.2 RAG Flow & AI Pipeline
@@ -82,6 +86,7 @@ sequenceDiagram
 | **User Service** | Profiles, Academic Hierarchy | `/me`, `/faculties`, `/courses` | PostgreSQL |
 | **Chat Service** | AI Tutoring, Learning Summary | `/chat`, `/session/{id}` | PostgreSQL |
 | **RAG Service** | Vector Search, Document Ingestion | `/search`, `/ingest` | Qdrant, PostgreSQL |
+| **Library Service** | Book Management & Secure Delivery | `/admin/books`, `/books/download` | PostgreSQL, S3 |
 | **Exam Service** | Async Exam Generation & Grading | `/generate`, `/{id}/submit` | PostgreSQL |
 | **Notification** | Email/FCM Delivery | `/notify` | - |
 
