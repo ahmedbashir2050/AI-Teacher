@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     GOOGLE_ISSUER: str = "https://accounts.google.com"
 
     REDIS_URL: str = "redis://redis:6379/0"
+    USER_SERVICE_URL: str = "http://user-service:8000"
 
     class Config:
         extra = "ignore"
