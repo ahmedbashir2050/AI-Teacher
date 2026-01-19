@@ -135,12 +135,36 @@ async def auth_route(request: Request, path: str):
 
 
 @app.api_route(
+    "/api/v1/admin/books{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def admin_books_route(
+    request: Request, path: str, user_data: dict = Depends(enforce_role(["admin", "super_admin"]))
+):
+    url = f"{settings.LIBRARY_SERVICE_URL}/admin/books{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
+
+
+@app.api_route(
+    "/api/v1/books{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def library_books_route(
+    request: Request, path: str, user_data: dict = Depends(get_current_user)
+):
+    url = f"{settings.LIBRARY_SERVICE_URL}/books{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
+
+
+@app.api_route(
     "/api/v1/admin/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE"],
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )
 async def admin_route(
-    request: Request, path: str, user_data: dict = Depends(enforce_role(["admin"]))
+    request: Request, path: str, user_data: dict = Depends(enforce_role(["admin", "super_admin"]))
 ):
     url = f"{settings.USER_SERVICE_URL}/admin/{path}"
     return await reverse_proxy(request, url, user_data=user_data)

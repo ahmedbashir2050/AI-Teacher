@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     CHAT_SERVICE_URL: str = "http://chat-service:8000"
     RAG_SERVICE_URL: str = "http://rag-service:8000"
     EXAM_SERVICE_URL: str = "http://exam-service:8000"
+    LIBRARY_SERVICE_URL: str = "http://library-service:8000"
 
     class Config:
         extra = "ignore"
