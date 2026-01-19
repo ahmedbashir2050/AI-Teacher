@@ -1,5 +1,6 @@
 # app/db/base.py
 import uuid
+
 from sqlalchemy import Column, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, declared_attr
@@ -7,6 +8,7 @@ from sqlalchemy.orm import declarative_base, declared_attr
 # Central declarative base for all ORM models.
 # This Base object will collect metadata for all tables.
 Base = declarative_base()
+
 
 class BaseModel(Base):
     """
@@ -16,6 +18,7 @@ class BaseModel(Base):
     2. Automatic `created_at` and `updated_at` timestamp fields.
     3. An automatic table name generation scheme (e.g., 'User' -> 'users').
     """
+
     __abstract__ = True  # This ensures SQLAlchemy doesn't create a table for BaseModel.
 
     # Using UUID for primary keys is a good practice for distributed systems
@@ -25,7 +28,9 @@ class BaseModel(Base):
     # Timestamps to track record creation and last update.
     # `server_default` executes the function on the database side.
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     @declared_attr
     def __tablename__(cls) -> str:

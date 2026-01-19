@@ -1,10 +1,13 @@
-from openai import OpenAI, APIError
-from app.config import settings
 import logging
+
+from openai import APIError, OpenAI
+
+from app.config import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class LLMService:
     def __init__(self, api_key: str = settings.OPENAI_API_KEY):
@@ -17,14 +20,18 @@ class LLMService:
         self.client = OpenAI(api_key=api_key)
         logger.info("LLMService initialized successfully.")
 
-    def get_embedding(self, text: str, model: str = "text-embedding-3-small") -> list[float]:
+    def get_embedding(
+        self, text: str, model: str = "text-embedding-3-small"
+    ) -> list[float]:
         """
         Generates an embedding for the given text.
         """
         logger.info(f"Generating embedding for text using model '{model}'.")
         try:
             # The API expects a list of texts, even if it's just one.
-            response = self.client.embeddings.create(input=[text.replace("\n", " ")], model=model)
+            response = self.client.embeddings.create(
+                input=[text.replace("\n", " ")], model=model
+            )
             logger.info("Embedding generated successfully.")
             return response.data[0].embedding
         except APIError as e:
@@ -42,7 +49,7 @@ class LLMService:
                 messages=[
                     # No system message is needed as the prompt is highly specific
                     {"role": "user", "content": prompt}
-                ]
+                ],
             )
             completion = response.choices[0].message.content
             logger.info("Chat completion received successfully.")
@@ -50,6 +57,7 @@ class LLMService:
         except APIError as e:
             logger.error(f"OpenAI API error during chat completion: {e}")
             raise  # Re-raise the exception
+
 
 # Singleton instance
 llm_service = LLMService()

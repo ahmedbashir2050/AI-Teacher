@@ -3,12 +3,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.main import app
+
+from app.core.hashing import get_password_hash
+from app.core.security import UserRole
 from app.db.base import Base
 from app.db.session import get_db
-from app.core.hashing import get_password_hash
-from app.models.user import User, Role
-from app.core.security import UserRole
+from app.main import app
+from app.models.user import Role, User
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
@@ -19,6 +20,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 Base.metadata.create_all(bind=engine)
 
+
 def override_get_db():
     try:
         db = TestingSessionLocal()
@@ -26,7 +28,9 @@ def override_get_db():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = override_get_db
+
 
 @pytest.fixture(scope="function")
 def db_session():
@@ -37,6 +41,7 @@ def db_session():
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture(scope="function")
 def test_client():

@@ -1,14 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, BackgroundTasks, status
-from sqlalchemy.orm import Session
-from db.session import get_db
-from services import chat_service
-from pydantic import BaseModel
-from uuid import UUID
 from typing import Optional
-from fastapi_limiter.depends import RateLimiter
+from uuid import UUID
+
 from core.audit import log_audit
+from db.session import get_db
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Request,
+    status,
+)
+from fastapi_limiter.depends import RateLimiter
+from pydantic import BaseModel
+from services import chat_service
+from sqlalchemy.orm import Session
 
 router = APIRouter()
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -17,31 +27,48 @@ class ChatRequest(BaseModel):
     faculty_id: Optional[str] = None
     semester_id: Optional[str] = None
 
+
 class ChatResponse(BaseModel):
     message: str
     session_id: UUID
 
+
 def get_user_id_key(request: Request):
     # Use X-User-Id for rate limiting
     return request.headers.get("X-User-Id", request.client.host)
+
 
 @router.delete("/session/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     session_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...)
+    x_user_id: str = Header(...),
 ):
     from repository import chat_repository
+
     request_id = getattr(request.state, "request_id", None)
     success = chat_repository.soft_delete_session(db, session_id, x_user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Session not found or unauthorized")
 
-    log_audit(x_user_id, "delete", "chat_session", resource_id=str(session_id), request_id=request_id)
+    log_audit(
+        x_user_id,
+        "delete",
+        "chat_session",
+        resource_id=str(session_id),
+        request_id=request_id,
+    )
     return None
 
-@router.post("/chat", response_model=ChatResponse, dependencies=[Depends(RateLimiter(times=20, minutes=1, identifier=get_user_id_key))])
+
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    dependencies=[
+        Depends(RateLimiter(times=20, minutes=1, identifier=get_user_id_key))
+    ],
+)
 async def chat(
     request: ChatRequest,
     fastapi_req: Request,
@@ -49,7 +76,7 @@ async def chat(
     db: Session = Depends(get_db),
     x_user_id: str = Header(...),
     x_faculty_id: Optional[str] = Header(None),
-    x_semester_id: Optional[str] = Header(None)
+    x_semester_id: Optional[str] = Header(None),
 ):
     request_id = getattr(fastapi_req.state, "request_id", None)
 
@@ -58,9 +85,18 @@ async def chat(
     semester_id = request.semester_id or x_semester_id
 
     if not faculty_id or not semester_id:
-        raise HTTPException(status_code=400, detail="Academic context (Faculty and Semester) is required and non-bypassable.")
+        raise HTTPException(
+            status_code=400,
+            detail="Academic context (Faculty and Semester) is required and non-bypassable.",
+        )
 
-    assistant_message, session_id, learning_summary, history_delta, metadata = await chat_service.handle_chat_message(
+    (
+        assistant_message,
+        session_id,
+        learning_summary,
+        history_delta,
+        metadata,
+    ) = await chat_service.handle_chat_message(
         db,
         user_id=x_user_id,
         session_id=request.session_id,
@@ -68,7 +104,7 @@ async def chat(
         collection_name=request.collection_name,
         faculty_id=faculty_id,
         semester_id=semester_id,
-        request_id=request_id
+        request_id=request_id,
     )
 
     # Offload summarization to background
@@ -77,7 +113,7 @@ async def chat(
         db,
         session_id,
         learning_summary,
-        history_delta
+        history_delta,
     )
 
     log_audit(
@@ -86,6 +122,6 @@ async def chat(
         "chat_session",
         resource_id=str(session_id),
         metadata=metadata,
-        request_id=request_id
+        request_id=request_id,
     )
     return ChatResponse(message=assistant_message, session_id=session_id)

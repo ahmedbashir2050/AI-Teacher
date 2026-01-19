@@ -1,5 +1,7 @@
-from pypdf import PdfReader
 from typing import IO
+
+from pypdf import PdfReader
+
 
 def load_pdf(file: IO) -> str:
     """

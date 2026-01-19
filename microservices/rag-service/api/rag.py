@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from services.qdrant_service import QdrantService
-from rag.embeddings import generate_embedding
-from tasks import ingest_document_task
-from core.cache import cache_result
 from core.audit import log_audit
-from qdrant_client import models
+from core.cache import cache_result
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from qdrant_client import models
+from rag.embeddings import generate_embedding
+from services.qdrant_service import QdrantService
+from tasks import ingest_document_task
 
 router = APIRouter()
+
 
 class SearchRequest(BaseModel):
     query: str
@@ -16,9 +17,11 @@ class SearchRequest(BaseModel):
     faculty_id: str
     semester_id: str
 
+
 class SearchResult(BaseModel):
     text: str
     score: float
+
 
 @router.post("/search")
 @cache_result(ttl=600)
@@ -28,6 +31,7 @@ async def search(request: SearchRequest):
     # it might need conversion.
     return await _do_search(request)
 
+
 async def _do_search(request: SearchRequest):
     qs = QdrantService(collection_name=request.collection_name)
     query_vector = await generate_embedding(request.query)
@@ -35,17 +39,33 @@ async def _do_search(request: SearchRequest):
         # Enforce Faculty + Semester isolation
         query_filter = models.Filter(
             must=[
-                models.FieldCondition(key="faculty_id", match=models.MatchValue(value=request.faculty_id)),
-                models.FieldCondition(key="semester_id", match=models.MatchValue(value=request.semester_id)),
+                models.FieldCondition(
+                    key="faculty_id", match=models.MatchValue(value=request.faculty_id)
+                ),
+                models.FieldCondition(
+                    key="semester_id",
+                    match=models.MatchValue(value=request.semester_id),
+                ),
             ]
         )
-        search_results = qs.search(vector=query_vector, limit=request.top_k, query_filter=query_filter)
-        return [{"text": point.payload["text"], "score": point.score} for point in search_results]
+        search_results = qs.search(
+            vector=query_vector, limit=request.top_k, query_filter=query_filter
+        )
+        return [
+            {"text": point.payload["text"], "score": point.score}
+            for point in search_results
+        ]
     except Exception:
         return []
 
+
 @router.post("/ingest")
-async def ingest_document(collection_name: str, faculty_id: str, semester_id: str, file: UploadFile = File(...)):
+async def ingest_document(
+    collection_name: str,
+    faculty_id: str,
+    semester_id: str,
+    file: UploadFile = File(...),
+):
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
@@ -53,11 +73,7 @@ async def ingest_document(collection_name: str, faculty_id: str, semester_id: st
 
     # Trigger async task
     task = ingest_document_task.delay(
-        collection_name,
-        faculty_id,
-        semester_id,
-        file_content,
-        file.filename
+        collection_name, faculty_id, semester_id, file_content, file.filename
     )
 
     log_audit(
@@ -69,12 +85,12 @@ async def ingest_document(collection_name: str, faculty_id: str, semester_id: st
             "faculty_id": faculty_id,
             "semester_id": semester_id,
             "filename": file.filename,
-            "task_id": task.id
-        }
+            "task_id": task.id,
+        },
     )
 
     return {
         "message": "Ingestion started",
         "task_id": task.id,
-        "filename": file.filename
+        "filename": file.filename,
     }

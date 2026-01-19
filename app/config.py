@@ -1,7 +1,7 @@
-from pydantic_settings import BaseSettings
-
 from pathlib import Path
+
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 # Use pathlib to find the project root and load the .env file
 # This makes the .env loading robust and independent of the working directory
@@ -45,10 +45,12 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = dotenv_path
-        env_file_encoding = 'utf-8'
-        extra = 'ignore'
+        env_file_encoding = "utf-8"
+        extra = "ignore"
+
 
 def get_settings() -> Settings:
     return Settings()
+
 
 settings = get_settings()

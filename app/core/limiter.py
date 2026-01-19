@@ -1,8 +1,10 @@
+from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 from app.config import settings
-from fastapi import Request
 from app.core.security import decode_token
+
 
 def get_username_from_request(request: Request) -> str | None:
     auth_header = request.headers.get("Authorization")
@@ -13,6 +15,7 @@ def get_username_from_request(request: Request) -> str | None:
             return token_data.username
     return None
 
+
 def rate_limit_key_func(request: Request) -> str:
     """
     Key function for rate limiting.
@@ -22,5 +25,6 @@ def rate_limit_key_func(request: Request) -> str:
     if username:
         return username
     return get_remote_address(request)
+
 
 limiter = Limiter(key_func=rate_limit_key_func, storage_uri=settings.REDIS_URL)

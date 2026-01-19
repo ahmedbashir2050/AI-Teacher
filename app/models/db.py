@@ -1,18 +1,20 @@
+import enum
+
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    ForeignKey,
-    DateTime,
-    Text,
-    Enum,
     ARRAY,
     JSON,
     Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import enum
+
 from app.db.base import Base
 
 
@@ -34,6 +36,7 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="user")
     exam_attempts = relationship("ExamAttempt", back_populates="user")
 
+
 class Faculty(Base):
     __tablename__ = "faculties"
     id = Column(Integer, primary_key=True, index=True)
@@ -41,6 +44,7 @@ class Faculty(Base):
 
     # Relationships
     departments = relationship("Department", back_populates="faculty")
+
 
 class Department(Base):
     __tablename__ = "departments"
@@ -52,15 +56,17 @@ class Department(Base):
     faculty = relationship("Faculty", back_populates="departments")
     semesters = relationship("Semester", back_populates="department")
 
+
 class Semester(Base):
     __tablename__ = "semesters"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False) # e.g., "Fall 2024"
+    name = Column(String, nullable=False)  # e.g., "Fall 2024"
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
 
     # Relationships
     department = relationship("Department", back_populates="semesters")
     courses = relationship("Course", back_populates="semester")
+
 
 class Course(Base):
     __tablename__ = "courses"
@@ -71,6 +77,7 @@ class Course(Base):
     # Relationships
     semester = relationship("Semester", back_populates="courses")
     books = relationship("Book", back_populates="course")
+
 
 class Book(Base):
     __tablename__ = "books"
@@ -83,6 +90,7 @@ class Book(Base):
     course = relationship("Course", back_populates="books")
     exams = relationship("Exam", back_populates="book")
 
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     id = Column(Integer, primary_key=True, index=True)
@@ -93,9 +101,11 @@ class ChatSession(Base):
     user = relationship("User", back_populates="chat_sessions")
     messages = relationship("ChatMessage", back_populates="session")
 
+
 class ChatMessageRole(enum.Enum):
     USER = "user"
     ASSISTANT = "assistant"
+
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -109,6 +119,7 @@ class ChatMessage(Base):
     # Relationships
     session = relationship("ChatSession", back_populates="messages")
 
+
 class Exam(Base):
     __tablename__ = "exams"
     id = Column(Integer, primary_key=True, index=True)
@@ -121,9 +132,11 @@ class Exam(Base):
     questions = relationship("ExamQuestion", back_populates="exam")
     attempts = relationship("ExamAttempt", back_populates="exam")
 
+
 class ExamQuestionType(enum.Enum):
     MCQ = "mcq"
     THEORY = "theory"
+
 
 class ExamQuestion(Base):
     __tablename__ = "exam_questions"
@@ -131,11 +144,12 @@ class ExamQuestion(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"), nullable=False)
     question_type = Column(Enum(ExamQuestionType), nullable=False)
     question_text = Column(Text, nullable=False)
-    options = Column(JSON) # For MCQ
+    options = Column(JSON)  # For MCQ
     correct_answer = Column(Text, nullable=False)
 
     # Relationships
     exam = relationship("Exam", back_populates="questions")
+
 
 class ExamAttempt(Base):
     __tablename__ = "exam_attempts"
@@ -150,6 +164,7 @@ class ExamAttempt(Base):
     exam = relationship("Exam", back_populates="attempts")
     user = relationship("User", back_populates="exam_attempts")
     answers = relationship("ExamAttemptAnswer", back_populates="attempt")
+
 
 class ExamAttemptAnswer(Base):
     __tablename__ = "exam_attempt_answers"

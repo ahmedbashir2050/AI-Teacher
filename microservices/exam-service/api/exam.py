@@ -1,20 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
-from sqlalchemy.orm import Session
-from db.session import get_db
-from repository import exam_repository
-from tasks import generate_exam_task
-from core.audit import log_audit
-from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
 
+from core.audit import log_audit
+from db.session import get_db
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel
+from repository import exam_repository
+from sqlalchemy.orm import Session
+from tasks import generate_exam_task
+
 router = APIRouter()
+
 
 class ExamCreateRequest(BaseModel):
     course_id: str
     collection_name: str
     mcq_count: int = 5
     theory_count: int = 2
+
 
 class ExamResponse(BaseModel):
     id: Optional[UUID] = None
@@ -23,12 +26,13 @@ class ExamResponse(BaseModel):
     status: str = "pending"
     task_id: Optional[str] = None
 
+
 @router.post("/generate", response_model=ExamResponse)
 async def generate_exam(
     request: ExamCreateRequest,
     fastapi_req: Request,
     db: Session = Depends(get_db),
-    x_user_id: str = Header(...)
+    x_user_id: str = Header(...),
 ):
     request_id = getattr(fastapi_req.state, "request_id", None)
 
@@ -39,7 +43,7 @@ async def generate_exam(
         request.collection_name,
         request.mcq_count,
         request.theory_count,
-        request_id
+        request_id,
     )
 
     log_audit(
@@ -49,16 +53,13 @@ async def generate_exam(
         metadata={
             "course_id": request.course_id,
             "collection_name": request.collection_name,
-            "task_id": task.id
+            "task_id": task.id,
         },
-        request_id=request_id
+        request_id=request_id,
     )
 
-    return ExamResponse(
-        course_id=request.course_id,
-        status="accepted",
-        task_id=task.id
-    )
+    return ExamResponse(course_id=request.course_id, status="accepted", task_id=task.id)
+
 
 @router.get("/{exam_id}", response_model=ExamResponse)
 def get_exam(exam_id: UUID, db: Session = Depends(get_db)):
