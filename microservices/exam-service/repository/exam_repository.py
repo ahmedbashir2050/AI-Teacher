@@ -1,11 +1,25 @@
 from uuid import UUID, uuid4
 
-from models.exam import Exam, Question
+from models.exam import Exam, ExamAttempt, Question
 from sqlalchemy.orm import Session
 
 
-def create_exam(db: Session, title: str, course_id: str, creator_id: str):
-    db_exam = Exam(id=uuid4(), title=title, course_id=course_id, creator_id=creator_id)
+def create_exam(
+    db: Session,
+    title: str,
+    course_id: str,
+    creator_id: str,
+    faculty_id: str = None,
+    semester_id: str = None,
+):
+    db_exam = Exam(
+        id=uuid4(),
+        title=title,
+        course_id=course_id,
+        creator_id=creator_id,
+        faculty_id=faculty_id,
+        semester_id=semester_id,
+    )
     db.add(db_exam)
     db.commit()
     db.refresh(db_exam)
@@ -42,3 +56,24 @@ def get_exam_questions(db: Session, exam_id: UUID):
         .filter(Question.exam_id == exam_id, Question.is_deleted.is_(None))
         .all()
     )
+
+
+from sqlalchemy import func
+
+
+def get_performance_stats(db: Session, course_id: str = None, faculty_id: str = None):
+    query = db.query(
+        func.avg(ExamAttempt.score).label("average_score"),
+        func.count(ExamAttempt.id).label("total_attempts"),
+    ).join(Exam)
+
+    if course_id:
+        query = query.filter(Exam.course_id == course_id)
+    if faculty_id:
+        query = query.filter(Exam.faculty_id == faculty_id)
+
+    stats = query.one()
+    return {
+        "average_score": float(stats.average_score or 0),
+        "total_attempts": int(stats.total_attempts or 0),
+    }

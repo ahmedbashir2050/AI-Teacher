@@ -87,7 +87,7 @@ sequenceDiagram
 | **Chat Service** | AI Tutoring, Learning Summary | `/chat`, `/session/{id}` | PostgreSQL |
 | **RAG Service** | Vector Search, Document Ingestion | `/search`, `/ingest` | Qdrant, PostgreSQL |
 | **Library Service** | Book Management & Secure Delivery | `/admin/books`, `/books/download` | PostgreSQL, S3 |
-| **Exam Service** | Async Exam Generation & Grading | `/generate`, `/{id}/submit` | PostgreSQL |
+| **Exam Service** | Async Exam Generation & Grading | `/generate`, `/{id}/submit`, `/teacher/performance` | PostgreSQL |
 | **Notification** | Email/FCM Delivery | `/notify` | - |
 
 ---
@@ -152,5 +152,5 @@ All services implement structured JSON logging for critical events.
 
 ## 🔐 6. Security
 - **Non-Root Execution**: All Docker containers run as `appuser`.
-- **RBAC**: Enforced at the API Gateway level (ADMIN, ACADEMIC, STUDENT).
-- **Data Isolation**: Multi-tenant isolation enforced via `faculty_id` and `semester_id` filters in all RAG and Chat queries.
+- **RBAC**: Enforced at the API Gateway level (SUPER_ADMIN, ADMIN, TEACHER, STUDENT).
+- **Data Isolation**: Multi-tenant isolation enforced via `faculty_id` and `semester_id` filters in all RAG and Chat queries. Teachers are strictly restricted to their assigned faculty.

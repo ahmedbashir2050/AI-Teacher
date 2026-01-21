@@ -1,5 +1,5 @@
 from db.base import BaseModel
-from sqlalchemy import Boolean, Column, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, Column, Float, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 
@@ -31,4 +31,8 @@ class AnswerAuditLog(BaseModel):
     ai_answer = Column(Text, nullable=False)
     source_reference = Column(Text)  # JSON string of source info
     verified = Column(Boolean, default=False)
+    verified_by_teacher = Column(Boolean, default=False)
+    teacher_comment = Column(Text)
+    rag_confidence_score = Column(Float)
+    custom_tags = Column(JSON)
     is_correct = Column(Boolean, nullable=True)  # student feedback

@@ -32,14 +32,13 @@ class BookResponse(BaseModel):
         from_attributes = True
 
 
-def get_current_admin(request: Request):
+def get_current_staff(request: Request):
     user_id = request.headers.get("X-User-Id")
     role = request.headers.get("X-User-Role")
-    if not user_id or role not in ["admin", "super_admin"]:
-        raise HTTPException(
-            status_code=403, detail="Forbidden: Admin access required"
-        )
-    return user_id
+    faculty_id = request.headers.get("X-User-Faculty-Id")
+    if not user_id or role not in ["admin", "super_admin", "teacher"]:
+        raise HTTPException(status_code=403, detail="Forbidden: Staff access required")
+    return {"user_id": user_id, "role": role, "faculty_id": faculty_id}
 
 
 @router.post("/books", response_model=BookResponse)
@@ -52,8 +51,18 @@ async def upload_book(
     language: str = Form("ar"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_admin),
+    staff: dict = Depends(get_current_staff),
 ):
+    user_id = staff["user_id"]
+    repo = BookRepository(db)
+
+    # Teacher Restriction: Can only upload to their faculty
+    if staff["role"] == "teacher":
+        if not staff["faculty_id"] or str(staff["faculty_id"]) != str(faculty_id):
+            raise HTTPException(
+                status_code=403, detail="Teachers can only upload to their own faculty"
+            )
+
     start_time = time.time()
     # Validation: File type
     if not file.filename.lower().endswith(".pdf"):
@@ -67,8 +76,6 @@ async def upload_book(
         raise HTTPException(status_code=400, detail="File too large (max 50MB)")
 
     file_hash = hashlib.sha256(content).hexdigest()
-
-    repo = BookRepository(db)
 
     # Check for duplicates
     existing_book = repo.get_book_by_hash(file_hash)
@@ -142,14 +149,34 @@ async def update_book(
     request: Request,
     book_id: UUID,
     title: Optional[str] = None,
+    semester: Optional[int] = None,
+    language: Optional[str] = None,
     is_active: Optional[bool] = None,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_admin),
+    staff: dict = Depends(get_current_staff),
 ):
+    user_id = staff["user_id"]
     repo = BookRepository(db)
+
+    # Teacher Restriction
+    if staff["role"] == "teacher":
+        book = repo.get_book_by_id(book_id)
+        if (
+            not book
+            or not staff["faculty_id"]
+            or str(book.faculty_id) != str(staff["faculty_id"])
+        ):
+            raise HTTPException(
+                status_code=403, detail="Teachers can only update their own faculty books"
+            )
+
     update_data = {}
     if title is not None:
         update_data["title"] = title
+    if semester is not None:
+        update_data["semester"] = semester
+    if language is not None:
+        update_data["language"] = language
     if is_active is not None:
         update_data["is_active"] = is_active
 
@@ -174,9 +201,23 @@ async def delete_book(
     request: Request,
     book_id: UUID,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_admin),
+    staff: dict = Depends(get_current_staff),
 ):
+    user_id = staff["user_id"]
     repo = BookRepository(db)
+
+    # Teacher Restriction
+    if staff["role"] == "teacher":
+        book = repo.get_book_by_id(book_id)
+        if (
+            not book
+            or not staff["faculty_id"]
+            or str(book.faculty_id) != str(staff["faculty_id"])
+        ):
+            raise HTTPException(
+                status_code=403, detail="Teachers can only delete their own faculty books"
+            )
+
     success = repo.soft_delete_book(book_id)
     if not success:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -200,9 +241,16 @@ async def list_books(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_admin),
+    staff: dict = Depends(get_current_staff),
 ):
     repo = BookRepository(db)
+
+    # Teacher Restriction
+    if staff["role"] == "teacher":
+        if not staff["faculty_id"]:
+            return []
+        faculty_id = UUID(staff["faculty_id"])
+
     return repo.list_books(
         faculty_id=faculty_id,
         department_id=department_id,
@@ -218,12 +266,25 @@ class FacultyCreate(BaseModel):
 
 @router.post("/faculties")
 async def create_faculty(
+    request: Request,
     data: FacultyCreate,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_admin),
+    staff: dict = Depends(get_current_staff),
 ):
+    if staff["role"] == "teacher":
+        raise HTTPException(status_code=403, detail="Teachers cannot create faculties")
     repo = BookRepository(db)
-    return repo.create_faculty(name=data.name)
+    new_faculty = repo.create_faculty(name=data.name)
+
+    log_audit(
+        user_id=staff["user_id"],
+        action="FACULTY_CREATED",
+        resource="faculty",
+        resource_id=str(new_faculty.id),
+        metadata={"name": data.name},
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return new_faculty
 
 
 class DepartmentCreate(BaseModel):
@@ -233,9 +294,24 @@ class DepartmentCreate(BaseModel):
 
 @router.post("/departments")
 async def create_department(
+    request: Request,
     data: DepartmentCreate,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_admin),
+    staff: dict = Depends(get_current_staff),
 ):
+    if staff["role"] == "teacher":
+        raise HTTPException(
+            status_code=403, detail="Teachers cannot create departments"
+        )
     repo = BookRepository(db)
-    return repo.create_department(name=data.name, faculty_id=data.faculty_id)
+    new_dept = repo.create_department(name=data.name, faculty_id=data.faculty_id)
+
+    log_audit(
+        user_id=staff["user_id"],
+        action="DEPARTMENT_CREATED",
+        resource="department",
+        resource_id=str(new_dept.id),
+        metadata={"name": data.name, "faculty_id": str(data.faculty_id)},
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return new_dept

@@ -14,8 +14,11 @@ class UserUpdate(BaseModel):
     avatar_url: Optional[str] = None
     university_id: Optional[str] = None
     faculty: Optional[str] = None
+    faculty_id: Optional[UUID] = None
     major: Optional[str] = None
+    department_id: Optional[UUID] = None
     semester: Optional[str] = None
+    semester_id: Optional[UUID] = None
 
 class UserCreateInternal(BaseModel):
     email: EmailStr
@@ -34,8 +37,11 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     university_id: Optional[str] = None
     faculty: Optional[str] = None
+    faculty_id: Optional[UUID] = None
     major: Optional[str] = None
+    department_id: Optional[UUID] = None
     semester: Optional[str] = None
+    semester_id: Optional[UUID] = None
     is_active: bool
 
     class Config:

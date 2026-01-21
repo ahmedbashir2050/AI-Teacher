@@ -95,6 +95,7 @@ def create_answer_audit_log(
     ai_answer: str,
     source_info: dict,
     book_id: str = None,
+    rag_confidence_score: float = None,
 ):
     log_entry = AnswerAuditLog(
         id=uuid4(),
@@ -105,6 +106,7 @@ def create_answer_audit_log(
         ai_answer=ai_answer,
         source_reference=json.dumps(source_info),
         verified=False,
+        rag_confidence_score=rag_confidence_score,
     )
     db.add(log_entry)
     db.commit()
@@ -120,6 +122,61 @@ def update_answer_feedback(db: Session, log_id: UUID, is_correct: bool):
         db.refresh(log_entry)
         return True
     return False
+
+
+def verify_answer_by_teacher(
+    db: Session, log_id: UUID, verified: bool, comment: str = None, custom_tags: list = None
+):
+    log_entry = db.query(AnswerAuditLog).filter(AnswerAuditLog.id == log_id).first()
+    if log_entry:
+        log_entry.verified_by_teacher = verified
+        log_entry.teacher_comment = comment
+        if custom_tags is not None:
+            log_entry.custom_tags = custom_tags
+        db.commit()
+        db.refresh(log_entry)
+        return True
+    return False
+
+
+def get_answers_for_review(
+    db: Session, faculty_id: str = None, skip: int = 0, limit: int = 50
+):
+    query = db.query(AnswerAuditLog).join(
+        ChatSession, AnswerAuditLog.session_id == ChatSession.id
+    )
+    if faculty_id:
+        query = query.filter(ChatSession.faculty_id == faculty_id)
+
+    return (
+        query.order_by(AnswerAuditLog.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+from sqlalchemy import func, case
+
+
+def get_performance_stats(db: Session, faculty_id: str = None):
+    query = db.query(
+        func.avg(AnswerAuditLog.rag_confidence_score).label("avg_confidence"),
+        func.count(AnswerAuditLog.id).label("total_answers"),
+        func.avg(case((AnswerAuditLog.is_correct == True, 1), else_=0)).label(
+            "positive_feedback_rate"
+        ),
+    ).join(ChatSession, AnswerAuditLog.session_id == ChatSession.id)
+
+    if faculty_id:
+        query = query.filter(ChatSession.faculty_id == faculty_id)
+
+    stats = query.one()
+    return {
+        "avg_confidence": float(stats.avg_confidence or 0),
+        "total_answers": int(stats.total_answers or 0),
+        "positive_feedback_rate": float(stats.positive_feedback_rate or 0),
+    }
 
 
 def verify_answer(db: Session, log_id: UUID, verified: bool = True):

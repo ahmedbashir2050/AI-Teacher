@@ -7,6 +7,8 @@ class Exam(BaseModel):
     __tablename__ = "exams"
     title = Column(String(255), nullable=False)
     course_id = Column(UUID(as_uuid=True), index=True, nullable=False)
+    faculty_id = Column(UUID(as_uuid=True), index=True)
+    semester_id = Column(UUID(as_uuid=True), index=True)
     creator_id = Column(UUID(as_uuid=True), index=True, nullable=False)
 
 
