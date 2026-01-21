@@ -67,6 +67,10 @@ async def reverse_proxy(request: Request, url: str, user_data: dict = None):
     if user_data:
         headers["X-User-Id"] = str(user_data.get("sub"))
         headers["X-User-Role"] = str(user_data.get("role"))
+        if user_data.get("faculty"):
+            headers["X-User-Faculty"] = str(user_data.get("faculty"))
+        if user_data.get("faculty_id"):
+            headers["X-User-Faculty-Id"] = str(user_data.get("faculty_id"))
 
     # Reuse body if it was already read by a dependency
     content = getattr(request.state, "body", None)
@@ -156,7 +160,11 @@ async def verify_enrollment(request: Request, user_data: dict = Depends(get_curr
     user_semester = str(user_data.get("semester"))
 
     if target_faculty and target_faculty != user_faculty:
-        raise HTTPException(status_code=403, detail=f"Not enrolled in faculty: {target_faculty}")
+        raise HTTPException(status_code=403, detail=f"Unauthorized faculty access: {target_faculty}")
+
+    # Teachers don't have a semester restriction, only faculty
+    if user_data.get("role") == "teacher":
+        return user_data
 
     if target_semester and str(target_semester) != user_semester:
         raise HTTPException(status_code=403, detail=f"Not enrolled in semester: {target_semester}")
@@ -187,9 +195,39 @@ async def auth_route(request: Request, path: str):
     dependencies=[Depends(RateLimiter(times=50, minutes=1))],
 )
 async def admin_books_route(
-    request: Request, path: str, user_data: dict = Depends(enforce_role(["admin", "super_admin"]))
+    request: Request,
+    path: str,
+    user_data: dict = Depends(enforce_role(["admin", "super_admin", "teacher"])),
 ):
     url = f"{settings.LIBRARY_SERVICE_URL}/admin/books{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
+
+
+@app.api_route(
+    "/api/v1/teacher/chat/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def teacher_chat_route(
+    request: Request,
+    path: str,
+    user_data: dict = Depends(enforce_role(["teacher", "admin", "super_admin"])),
+):
+    url = f"{settings.CHAT_SERVICE_URL}/teacher/{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
+
+
+@app.api_route(
+    "/api/v1/teacher/exams/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def teacher_exam_route(
+    request: Request,
+    path: str,
+    user_data: dict = Depends(enforce_role(["teacher", "admin", "super_admin"])),
+):
+    url = f"{settings.EXAM_SERVICE_URL}/teacher/{path}"
     return await reverse_proxy(request, url, user_data=user_data)
 
 

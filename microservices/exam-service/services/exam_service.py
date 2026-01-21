@@ -97,7 +97,12 @@ async def generate_and_store_exam(
         return None
 
     db_exam = exam_repository.create_exam(
-        db, f"Exam for {course_id}", course_id, user_id
+        db,
+        f"Exam for {course_id}",
+        course_id,
+        user_id,
+        faculty_id=faculty_id,
+        semester_id=semester_id,
     )
 
     for q in exam_data.get("questions", []):

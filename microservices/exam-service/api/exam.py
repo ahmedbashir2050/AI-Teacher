@@ -71,3 +71,22 @@ def get_exam(exam_id: UUID, db: Session = Depends(get_db)):
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
     return exam
+
+
+@router.get("/teacher/performance")
+async def get_teacher_performance(
+    course_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    x_user_role: str = Header(...),
+    x_user_faculty_id: Optional[str] = Header(None),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Strict RBAC: Teachers MUST have a faculty_id
+    if x_user_role == "teacher" and not x_user_faculty_id:
+        raise HTTPException(status_code=403, detail="Teacher faculty context missing")
+
+    return exam_repository.get_performance_stats(
+        db, course_id=course_id, faculty_id=x_user_faculty_id
+    )

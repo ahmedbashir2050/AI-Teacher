@@ -145,7 +145,9 @@ async def google_login(
             "email": user["email"],
             "auth_provider": user["auth_provider"],
             "faculty": user.get("faculty"),
+            "faculty_id": user.get("faculty_id"),
             "semester": user.get("semester"),
+            "semester_id": user.get("semester_id"),
         }
     )
     refresh_token = create_refresh_token(
@@ -204,7 +206,9 @@ async def login(
             "email": user["email"],
             "auth_provider": user["auth_provider"],
             "faculty": user.get("faculty"),
+            "faculty_id": user.get("faculty_id"),
             "semester": user.get("semester"),
+            "semester_id": user.get("semester_id"),
         }
     )
     refresh_token = create_refresh_token(
@@ -291,7 +295,9 @@ async def refresh_token(request: Request, refresh_token: str):
                 "email": user["email"],
                 "auth_provider": user["auth_provider"],
                 "faculty": user.get("faculty"),
+                "faculty_id": user.get("faculty_id"),
                 "semester": user.get("semester"),
+                "semester_id": user.get("semester_id"),
             }
         )
         new_refresh_token = create_refresh_token(

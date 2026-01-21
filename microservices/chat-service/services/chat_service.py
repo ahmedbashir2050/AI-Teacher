@@ -262,6 +262,7 @@ async def _handle_chat_message_logic(
         ai_answer=assistant_message,
         source_info=source_info,
         book_id=relevant_chunks[0].get("book_id") if relevant_chunks else None,
+        rag_confidence_score=max_score,
     )
 
     # Prepare background task info (summarization)

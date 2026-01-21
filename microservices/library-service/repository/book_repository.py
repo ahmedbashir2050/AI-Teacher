@@ -58,6 +58,9 @@ class BookRepository:
     def get_faculty_by_id(self, faculty_id: UUID) -> Optional[Faculty]:
         return self.db.query(Faculty).filter(Faculty.id == faculty_id, Faculty.is_deleted.is_(None)).first()
 
+    def get_faculty_by_name(self, name: str) -> Optional[Faculty]:
+        return self.db.query(Faculty).filter(Faculty.name == name, Faculty.is_deleted.is_(None)).first()
+
     def get_department_by_id(self, department_id: UUID) -> Optional[Department]:
         return self.db.query(Department).filter(Department.id == department_id, Department.is_deleted.is_(None)).first()
 

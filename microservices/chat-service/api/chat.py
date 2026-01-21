@@ -40,6 +40,27 @@ class FeedbackRequest(BaseModel):
     is_correct: bool
 
 
+class AnswerReviewResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    question_text: str
+    ai_answer: str
+    rag_confidence_score: Optional[float] = None
+    verified_by_teacher: bool
+    teacher_comment: Optional[str] = None
+    custom_tags: Optional[list[str]] = None
+    is_correct: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TeacherVerifyRequest(BaseModel):
+    verified: bool
+    comment: Optional[str] = None
+    custom_tags: Optional[list[str]] = None
+
+
 def get_user_id_key(request: Request):
     # Use X-User-Id for rate limiting
     return request.headers.get("X-User-Id", request.client.host)
@@ -158,6 +179,73 @@ async def student_feedback(
     if not success:
         raise HTTPException(status_code=404, detail="Audit log not found")
     return {"status": "success"}
+
+
+@router.get("/teacher/answers", response_model=list[AnswerReviewResponse])
+async def get_teacher_answers(
+    db: Session = Depends(get_db),
+    x_user_role: str = Header(...),
+    x_user_faculty_id: Optional[str] = Header(None),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Strict RBAC: Teachers MUST have a faculty_id
+    if x_user_role == "teacher" and not x_user_faculty_id:
+        raise HTTPException(status_code=403, detail="Teacher faculty context missing")
+
+    from repository import chat_repository
+
+    return chat_repository.get_answers_for_review(db, faculty_id=x_user_faculty_id)
+
+
+@router.post("/teacher/verify/{log_id}")
+async def teacher_verify(
+    log_id: UUID,
+    request: TeacherVerifyRequest,
+    fastapi_req: Request,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+    x_user_role: str = Header(...),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from repository import chat_repository
+
+    success = chat_repository.verify_answer_by_teacher(
+        db, log_id, request.verified, request.comment, request.custom_tags
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Audit log not found")
+
+    log_audit(
+        x_user_id,
+        "teacher_verify",
+        "answer_audit_log",
+        resource_id=str(log_id),
+        metadata={"verified": request.verified, "comment": request.comment},
+        request_id=getattr(fastapi_req.state, "request_id", None),
+    )
+    return {"status": "success"}
+
+
+@router.get("/teacher/performance")
+async def get_teacher_performance(
+    db: Session = Depends(get_db),
+    x_user_role: str = Header(...),
+    x_user_faculty_id: Optional[str] = Header(None),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Strict RBAC: Teachers MUST have a faculty_id
+    if x_user_role == "teacher" and not x_user_faculty_id:
+        raise HTTPException(status_code=403, detail="Teacher faculty context missing")
+
+    from repository import chat_repository
+
+    return chat_repository.get_performance_stats(db, faculty_id=x_user_faculty_id)
 
 
 @router.post("/verify/{log_id}")
