@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from core.audit import log_audit
-from db.session import get_db
+from core.cache import cache_result
+from db.session import get_db, get_read_db
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -48,7 +49,7 @@ class AnswerReviewResponse(BaseModel):
     rag_confidence_score: Optional[float] = None
     verified_by_teacher: bool
     teacher_comment: Optional[str] = None
-    custom_tags: Optional[list[str]] = None
+    custom_tags: Optional[List[str]] = None
     is_correct: Optional[bool] = None
 
     class Config:
@@ -58,7 +59,7 @@ class AnswerReviewResponse(BaseModel):
 class TeacherVerifyRequest(BaseModel):
     verified: bool
     comment: Optional[str] = None
-    custom_tags: Optional[list[str]] = None
+    custom_tags: Optional[List[str]] = None
 
 
 def get_user_id_key(request: Request):
@@ -181,9 +182,9 @@ async def student_feedback(
     return {"status": "success"}
 
 
-@router.get("/teacher/answers", response_model=list[AnswerReviewResponse])
+@router.get("/teacher/answers", response_model=List[AnswerReviewResponse])
 async def get_teacher_answers(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_read_db),
     x_user_role: str = Header(...),
     x_user_faculty_id: Optional[str] = Header(None),
 ):
@@ -199,9 +200,9 @@ async def get_teacher_answers(
     return chat_repository.get_answers_for_review(db, faculty_id=x_user_faculty_id)
 
 
-@router.post("/teacher/verify/{log_id}")
+@router.post("/teacher/answers/{answer_id}/verify")
 async def teacher_verify(
-    log_id: UUID,
+    answer_id: UUID,
     request: TeacherVerifyRequest,
     fastapi_req: Request,
     db: Session = Depends(get_db),
@@ -214,25 +215,94 @@ async def teacher_verify(
     from repository import chat_repository
 
     success = chat_repository.verify_answer_by_teacher(
-        db, log_id, request.verified, request.comment, request.custom_tags
+        db, answer_id, request.verified, request.comment, request.custom_tags
     )
     if not success:
-        raise HTTPException(status_code=404, detail="Audit log not found")
+        raise HTTPException(status_code=404, detail="Answer not found")
 
     log_audit(
         x_user_id,
         "teacher_verify",
         "answer_audit_log",
-        resource_id=str(log_id),
+        resource_id=str(answer_id),
         metadata={"verified": request.verified, "comment": request.comment},
         request_id=getattr(fastapi_req.state, "request_id", None),
     )
     return {"status": "success"}
 
 
+@router.post("/teacher/answers/{answer_id}/feedback")
+async def teacher_feedback(
+    answer_id: UUID,
+    request: TeacherVerifyRequest,  # Reuse model for feedback
+    fastapi_req: Request,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+    x_user_role: str = Header(...),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from repository import chat_repository
+
+    # Feedback is essentially a verification with a comment
+    success = chat_repository.verify_answer_by_teacher(
+        db, answer_id, True, request.comment, request.custom_tags
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Answer not found")
+
+    log_audit(
+        x_user_id,
+        "teacher_feedback",
+        "answer_audit_log",
+        resource_id=str(answer_id),
+        metadata={"comment": request.comment},
+        request_id=getattr(fastapi_req.state, "request_id", None),
+    )
+    return {"status": "success"}
+
+
+@router.get("/teacher/students/{student_id}/ai-confidence")
+@cache_result(ttl=600)
+async def get_student_confidence(
+    student_id: UUID,
+    db: Session = Depends(get_read_db),
+    x_user_role: str = Header(...),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from repository import chat_repository
+
+    confidence = chat_repository.get_student_ai_confidence(db, student_id)
+    return {"student_id": student_id, "ai_confidence_score": confidence or 0.0}
+
+
+@router.get("/teacher/courses/{course_id}/progress")
+@cache_result(ttl=600)
+async def get_course_chat_progress(
+    course_id: str,
+    db: Session = Depends(get_read_db),
+    x_user_role: str = Header(...),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from repository import chat_repository
+
+    stats = chat_repository.get_course_progress(db, course_id)
+    return {
+        "course_id": course_id,
+        "total_interactions": stats.total_interactions,
+        "avg_confidence": float(stats.avg_confidence or 0),
+        "unique_students": stats.unique_students,
+    }
+
+
 @router.get("/teacher/performance")
 async def get_teacher_performance(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_read_db),
     x_user_role: str = Header(...),
     x_user_faculty_id: Optional[str] = Header(None),
 ):

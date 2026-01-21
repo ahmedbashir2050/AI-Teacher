@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from core.audit import log_audit
-from db.session import get_db
+from core.cache import cache_result
+from db.session import get_db, get_read_db
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from repository import exam_repository
@@ -66,7 +67,7 @@ async def generate_exam(
 
 
 @router.get("/{exam_id}", response_model=ExamResponse)
-def get_exam(exam_id: UUID, db: Session = Depends(get_db)):
+def get_exam(exam_id: UUID, db: Session = Depends(get_read_db)):
     exam = exam_repository.get_exam(db, exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
@@ -76,7 +77,7 @@ def get_exam(exam_id: UUID, db: Session = Depends(get_db)):
 @router.get("/teacher/performance")
 async def get_teacher_performance(
     course_id: Optional[str] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_read_db),
     x_user_role: str = Header(...),
     x_user_faculty_id: Optional[str] = Header(None),
 ):
@@ -90,3 +91,29 @@ async def get_teacher_performance(
     return exam_repository.get_performance_stats(
         db, course_id=course_id, faculty_id=x_user_faculty_id
     )
+
+
+@router.get("/teacher/courses/{course_id}/progress")
+@cache_result(ttl=600)
+async def get_course_exam_progress(
+    course_id: str,
+    db: Session = Depends(get_read_db),
+    x_user_role: str = Header(...),
+    x_user_faculty_id: Optional[str] = Header(None),
+):
+    if x_user_role not in ["teacher", "admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Strict RBAC: Teachers MUST have a faculty_id
+    if x_user_role == "teacher" and not x_user_faculty_id:
+        raise HTTPException(status_code=403, detail="Teacher faculty context missing")
+
+    results = exam_repository.get_course_progress(db, course_id)
+    return [
+        {
+            "student_id": str(r.user_id),
+            "avg_score": float(r.avg_score or 0),
+            "exams_taken": r.exams_taken,
+        }
+        for r in results
+    ]

@@ -74,6 +74,41 @@ sequenceDiagram
     C-->>U: Final AI Response
 ```
 
+### 1.3 RAG AI Confidence & Hallucination Guardrails
+The system implements a multi-stage groundedness check:
+1. **Retrieval Score**: RAG pipeline calculates cosine similarity (Threshold >= 0.7).
+2. **Context sufficiency**: LLM evaluates if the retrieved chunks contain enough information to answer.
+3. **Response Validation**: Final response is checked against source chunks for factual consistency.
+4. **Teacher Verification**: Teachers manually review answers to provide a ground-truth feedback loop, which is logged and used for system tuning.
+
+### 1.4 Teacher & Admin Workflows
+
+```mermaid
+sequenceDiagram
+    participant T as Teacher/Admin
+    participant G as API Gateway
+    participant C as Chat Service
+    participant L as Library Service
+    participant E as Exam Service
+
+    Note over T, E: Answer Verification
+    T->>G: POST /api/v1/answers/{id}/verify
+    G->>C: POST /teacher/answers/{id}/verify
+    C->>C: Update Audit Log & Store Feedback
+    C-->>T: Success
+
+    Note over T, E: Curriculum Approval
+    T->>G: POST /api/v1/curriculum/{id}/approve
+    G->>L: POST /admin/curriculum/{id}/approve
+    L->>L: Update Book Approval Status
+    L-->>T: Success
+
+    Note over T, E: Progress Monitoring
+    T->>G: GET /api/v1/courses/{id}/progress
+    G->>E: GET /teacher/courses/{id}/progress
+    E-->>T: Aggregate Student Scores
+```
+
 ---
 
 ## 🛠️ 2. Service Responsibilities

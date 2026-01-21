@@ -31,23 +31,37 @@ In `chat-service`, the `AnswerAuditLog` model now includes:
 
 ### New API Endpoints
 
-#### Chat Service
+#### Public Gateway Endpoints (V1)
+| Endpoint | Method | Description | Role |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/answers/{id}/verify` | `POST` | Verify an AI answer | Teacher, Admin |
+| `/api/v1/answers/{id}/feedback` | `POST` | Provide feedback on an AI answer | Teacher, Admin |
+| `/api/v1/curriculum/{id}/approve` | `POST` | Approve/Reject course material | Teacher, Admin |
+| `/api/v1/students/{id}/ai-confidence` | `GET` | Get a student's average AI confidence | Teacher, Admin |
+| `/api/v1/courses/{id}/progress` | `GET` | Get course-wide student progress | Teacher, Admin |
+| `/api/v1/teachers/{id}/assign` | `POST` | Assign teacher to faculty/dept | Admin |
+
+#### Service Internal Endpoints
+
+**Chat Service**
 | Endpoint | Method | Description | Role |
 | :--- | :--- | :--- | :--- |
 | `/teacher/answers` | `GET` | Fetch answers for review (faculty scoped) | Teacher, Admin |
-| `/teacher/verify/{log_id}` | `POST` | Approve/Reject an answer with comments and tags | Teacher, Admin |
-| `/teacher/performance` | `GET` | Get aggregate AI performance stats (confidence, feedback) | Teacher, Admin |
+| `/teacher/answers/{id}/verify` | `POST` | Approve/Reject an answer with comments | Teacher, Admin |
+| `/teacher/students/{id}/ai-confidence` | `GET` | Get AI confidence for a student | Teacher, Admin |
+| `/teacher/performance` | `GET` | Get aggregate AI performance stats | Teacher, Admin |
 
-#### Exam Service
+**Exam Service**
 | Endpoint | Method | Description | Role |
 | :--- | :--- | :--- | :--- |
-| `/teacher/performance` | `GET` | Get aggregate exam performance stats (avg score, attempts) | Teacher, Admin |
+| `/teacher/performance` | `GET` | Get aggregate exam stats | Teacher, Admin |
+| `/teacher/courses/{id}/progress` | `GET` | Get student progress for a course | Teacher, Admin |
 
-#### Library Service
+**Library Service**
 | Endpoint | Method | Description | Role |
 | :--- | :--- | :--- | :--- |
-| `/admin/books` | `POST/PUT/DELETE` | Manage books (restricted to own faculty for teachers) | Teacher, Admin |
-| `/admin/books` | `GET` | List books (restricted to own faculty for teachers) | Teacher, Admin |
+| `/admin/books` | `POST/PUT/DELETE` | Manage books (faculty restricted) | Teacher, Admin |
+| `/admin/curriculum/{id}/approve` | `POST` | Approve curriculum material | Teacher, Admin |
 
 ## 🧪 RBAC Rules
 1. **Faculty Isolation**: Teachers can ONLY access data (answers, exams, books) where the `faculty_id` matches their own `X-User-Faculty-Id`.
@@ -80,7 +94,7 @@ In `chat-service`, the `AnswerAuditLog` model now includes:
 ```
 
 ### Verify Answer
-**Request**: `POST /api/v1/teacher/chat/verify/uuid-1`
+**Request**: `POST /api/v1/answers/uuid-1/verify`
 **Body**:
 ```json
 {
@@ -88,6 +102,19 @@ In `chat-service`, the `AnswerAuditLog` model now includes:
   "comment": "Perfect answer!",
   "custom_tags": ["high-quality", "accurate"]
 }
+```
+
+### Course Progress retrieval
+**Request**: `GET /api/v1/courses/physics-101/progress`
+**Response**:
+```json
+[
+  {
+    "student_id": "uuid-student-1",
+    "avg_score": 85.5,
+    "exams_taken": 3
+  }
+]
 ```
 
 ## 📊 Audit Logging

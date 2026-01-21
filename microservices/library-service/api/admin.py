@@ -5,9 +5,10 @@ from typing import List, Optional
 from uuid import UUID
 
 from core.audit import log_audit
+from core.cache import cache_result
 from core.celery_app import celery_app
 from core.metrics import BOOK_UPLOAD_LATENCY, RAG_INGESTION_TRIGGER_COUNT
-from db.session import get_db
+from db.session import get_db, get_read_db
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, Request
 from pydantic import BaseModel
 from repository.book_repository import BookRepository
@@ -27,6 +28,8 @@ class BookResponse(BaseModel):
     file_key: str
     uploaded_by: UUID
     is_active: bool
+    is_approved: bool
+    approved_by: Optional[UUID]
 
     class Config:
         from_attributes = True
@@ -234,13 +237,14 @@ async def delete_book(
 
 
 @router.get("/books", response_model=List[BookResponse])
+@cache_result(ttl=300)
 async def list_books(
     faculty_id: Optional[UUID] = Query(None),
     department_id: Optional[UUID] = Query(None),
     semester: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_read_db),
     staff: dict = Depends(get_current_staff),
 ):
     repo = BookRepository(db)
@@ -315,3 +319,51 @@ async def create_department(
         request_id=getattr(request.state, "request_id", None),
     )
     return new_dept
+
+
+class ApprovalRequest(BaseModel):
+    approved: bool
+
+
+@router.post("/curriculum/{curriculum_id}/approve", response_model=BookResponse)
+async def approve_curriculum(
+    request: Request,
+    curriculum_id: UUID,
+    approval: ApprovalRequest,
+    db: Session = Depends(get_db),
+    staff: dict = Depends(get_current_staff),
+):
+    user_id = staff["user_id"]
+    repo = BookRepository(db)
+
+    book = repo.get_book_by_id(curriculum_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Curriculum not found")
+
+    # Teacher Restriction: Can only approve their faculty's curriculum
+    if staff["role"] == "teacher":
+        if (
+            not staff["faculty_id"]
+            or str(book.faculty_id) != str(staff["faculty_id"])
+        ):
+            raise HTTPException(
+                status_code=403, detail="Teachers can only approve their own faculty curriculum"
+            )
+
+    update_data = {
+        "is_approved": approval.approved,
+        "approved_by": user_id if approval.approved else None
+    }
+
+    updated_book = repo.update_book(curriculum_id, update_data)
+
+    log_audit(
+        user_id=user_id,
+        action="CURRICULUM_APPROVED" if approval.approved else "CURRICULUM_REJECTED",
+        resource="book",
+        resource_id=str(curriculum_id),
+        metadata={"approved": approval.approved},
+        request_id=getattr(request.state, "request_id", None),
+    )
+
+    return updated_book
