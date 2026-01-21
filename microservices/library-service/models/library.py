@@ -32,6 +32,8 @@ class Book(BaseModel):
     file_hash = Column(String(64), unique=True, index=True, nullable=False) # For duplicate detection
     uploaded_by = Column(UUID(as_uuid=True), nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
+    is_approved = Column(Boolean, default=False, nullable=False, index=True)
+    approved_by = Column(UUID(as_uuid=True), nullable=True)
 
     faculty = relationship("Faculty")
     department = relationship("Department", back_populates="books")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Header, Request, HTTPException
 from sqlalchemy.orm import Session
-from db.session import get_db
+from db.session import get_db, get_read_db
 from core.services import user_service
 from core.audit import log_audit
 from pydantic import BaseModel, EmailStr
@@ -50,7 +50,7 @@ class UserResponse(BaseModel):
 @router.get("/me", response_model=UserResponse)
 def get_me(
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_read_db),
     x_user_id: str = Header(...)
 ):
     request_id = getattr(request.state, "request_id", None)
@@ -89,7 +89,7 @@ def update_me(
 @router.get("/internal/users/email/{email}", response_model=UserResponse)
 def get_user_by_email_internal(
     email: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_read_db)
 ):
     user = user_service.get_user_by_email(db, email)
     if not user:
@@ -99,7 +99,7 @@ def get_user_by_email_internal(
 @router.get("/internal/users/{user_id}", response_model=UserResponse)
 def get_user_by_id_internal(
     user_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_read_db)
 ):
     user = user_service.get_user_by_id(db, user_id)
     return user

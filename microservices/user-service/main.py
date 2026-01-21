@@ -2,6 +2,7 @@ import uuid
 
 from api.academics import router as academics_router
 from api.users import router as users_router
+from api.admin import router as admin_router
 from core.observability import instrument_app, setup_logging, setup_tracing
 from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -36,6 +37,7 @@ async def security_and_correlation_middleware(request: Request, call_next):
 
 app.include_router(academics_router, tags=["Academics"])
 app.include_router(users_router, tags=["Users"])
+app.include_router(admin_router, tags=["Admin"])
 
 
 @app.get("/health")
