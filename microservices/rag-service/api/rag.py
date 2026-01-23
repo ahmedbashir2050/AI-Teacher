@@ -18,6 +18,7 @@ class SearchRequest(BaseModel):
     faculty_id: str
     semester_id: str
     department_id: Optional[str] = None
+    book_id: Optional[str] = None
 
 
 class SearchResult(BaseModel):
@@ -56,6 +57,13 @@ async def _do_search(request: SearchRequest):
                 models.FieldCondition(
                     key="department_id",
                     match=models.MatchValue(value=request.department_id),
+                )
+            )
+        if request.book_id:
+            must_conditions.append(
+                models.FieldCondition(
+                    key="book_id",
+                    match=models.MatchValue(value=request.book_id),
                 )
             )
 
