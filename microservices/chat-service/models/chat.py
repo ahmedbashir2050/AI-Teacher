@@ -9,6 +9,7 @@ class ChatSession(BaseModel):
     collection_name = Column(String(255), index=True)
     faculty_id = Column(String(255), index=True)
     semester_id = Column(String(255), index=True)
+    book_id = Column(UUID(as_uuid=True), index=True) # Scoped to a specific book
     learning_summary = Column(Text)  # Summarized user learning state
     title = Column(String(255))
 

@@ -16,3 +16,14 @@ RAG_INGESTION_TRIGGER_COUNT = Counter(
     "rag_ingestion_trigger_total",
     "Total number of RAG ingestion tasks triggered"
 )
+
+BOOK_SELECTION_OPERATIONS = Counter(
+    "book_selection_operations_total",
+    "Total number of book selection operations",
+    ["action"] # action=add, remove
+)
+
+AVAILABLE_BOOKS_REQUESTS = Counter(
+    "available_books_requests_total",
+    "Total requests for available books"
+)

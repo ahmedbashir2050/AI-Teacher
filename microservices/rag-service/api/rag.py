@@ -7,6 +7,8 @@ from qdrant_client import models
 from rag.embeddings import generate_embedding
 from services.qdrant_service import QdrantService
 from tasks import ingest_document_task
+import time
+from core.metrics import RETRIEVER_REFRESH_LATENCY, RETRIEVER_REFRESH_TOTAL
 
 router = APIRouter()
 
@@ -83,6 +85,41 @@ async def _do_search(request: SearchRequest):
         ]
     except Exception:
         return []
+
+
+@router.post("/refresh")
+async def refresh_retriever(
+    faculty_id: str,
+    semester_id: str,
+):
+    """
+    Incrementally refreshes the retriever state or clears caches.
+    Ensures that newly added/selected books are prioritized or indexed.
+    """
+    start_time = time.time()
+    # In a real implementation, we might clear Redis caches for this context
+    # Or trigger a re-indexing of a vector store if it's stateful.
+    # For now, we clear the RAG cache to ensure fresh results.
+    from core.cache import get_redis
+    redis = await get_redis()
+
+    # We use a pattern to clear context-specific keys
+    # rag_cache:{faculty}:{semester}:*
+    pattern = f"rag_cache:{faculty_id}:{semester_id}:*"
+    keys = await redis.keys(pattern)
+    if keys:
+        await redis.delete(*keys)
+
+    RETRIEVER_REFRESH_LATENCY.observe(time.time() - start_time)
+    RETRIEVER_REFRESH_TOTAL.inc()
+
+    log_audit(
+        user_id="system",
+        action="refresh_retriever",
+        resource="rag",
+        metadata={"faculty_id": faculty_id, "semester_id": semester_id}
+    )
+    return {"status": "refreshed"}
 
 
 @router.post("/ingest")

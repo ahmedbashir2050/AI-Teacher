@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from db.session import get_db, get_read_db
 from core.services import user_service
 from core.audit import log_audit
+from core.config import settings
+import httpx
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from uuid import UUID
@@ -66,7 +68,7 @@ def get_me(
     return user
 
 @router.patch("/me", response_model=UserResponse)
-def update_me(
+async def update_me(
     request: Request,
     user_update: UserUpdate,
     db: Session = Depends(get_db),
@@ -74,11 +76,70 @@ def update_me(
 ):
     request_id = getattr(request.state, "request_id", None)
     update_data = user_update.model_dump(exclude_unset=True)
-    user = user_service.update_profile(db, UUID(x_user_id), update_data)
+
+    # Check if academic fields are present
+    academic_fields = {"faculty", "faculty_id", "major", "department_id", "semester", "semester_id"}
+    has_academic_update = any(field in update_data for field in academic_fields)
+
+    if has_academic_update:
+        user = user_service.update_academic_profile(db, UUID(x_user_id), update_data)
+        action = "USER_ACADEMIC_PROFILE_UPDATED"
+
+        # Hard Reset: Trigger cleanup in other services
+        async with httpx.AsyncClient() as client:
+            try:
+                # Invalidate chat sessions
+                await client.post(
+                    f"{settings.CHAT_SERVICE_URL}/internal/sessions/invalidate",
+                    json={"user_id": str(x_user_id)}
+                )
+                # Invalidate book selections
+                await client.post(
+                    f"{settings.LIBRARY_SERVICE_URL}/internal/student/{x_user_id}/reset"
+                )
+            except Exception:
+                pass
+    else:
+        user = user_service.update_profile(db, UUID(x_user_id), update_data)
+        action = "USER_PROFILE_UPDATED"
 
     log_audit(
         user_id=x_user_id,
-        action="USER_PROFILE_UPDATED",
+        action=action,
+        resource="user",
+        status="success",
+        metadata=update_data,
+        request_id=request_id
+    )
+    return user
+
+@router.patch("/me/academic", response_model=UserResponse)
+async def update_my_academic_profile(
+    request: Request,
+    user_update: UserUpdate,
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...)
+):
+    request_id = getattr(request.state, "request_id", None)
+    update_data = user_update.model_dump(exclude_unset=True)
+    user = user_service.update_academic_profile(db, UUID(x_user_id), update_data)
+
+    # Trigger hard reset
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(
+                f"{settings.CHAT_SERVICE_URL}/internal/sessions/invalidate",
+                json={"user_id": str(x_user_id)}
+            )
+            await client.post(
+                f"{settings.LIBRARY_SERVICE_URL}/internal/student/{x_user_id}/reset"
+            )
+        except Exception:
+            pass
+
+    log_audit(
+        user_id=x_user_id,
+        action="USER_ACADEMIC_PROFILE_UPDATED",
         resource="user",
         status="success",
         metadata=update_data,
