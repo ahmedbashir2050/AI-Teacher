@@ -325,6 +325,30 @@ async def exam_route(
     return await reverse_proxy(request, url, user_data=user_data)
 
 
+@app.api_route(
+    "/api/v1/pro-exams/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def pro_exam_route(
+    request: Request, path: str, user_data: dict = Depends(verify_enrollment)
+):
+    url = f"{settings.PRO_EXAM_SERVICE_URL}/api/v1/exams/{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
+
+
+@app.api_route(
+    "/api/v1/pro-submissions/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+    dependencies=[Depends(RateLimiter(times=50, minutes=1))],
+)
+async def pro_submission_route(
+    request: Request, path: str, user_data: dict = Depends(verify_enrollment)
+):
+    url = f"{settings.PRO_EXAM_SERVICE_URL}/api/v1/submissions/{path}"
+    return await reverse_proxy(request, url, user_data=user_data)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
