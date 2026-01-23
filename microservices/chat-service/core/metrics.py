@@ -35,3 +35,8 @@ ANSWER_LATENCY = Histogram(
     "Time taken to generate an AI answer",
     buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0]
 )
+
+START_CHAT_TOTAL = Counter(
+    "ai_teacher_start_chat_total",
+    "Total number of book-scoped chat starts"
+)

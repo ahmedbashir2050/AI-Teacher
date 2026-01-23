@@ -3,6 +3,7 @@ from uuid import UUID
 
 from core.audit import log_audit
 from core.cache import cache_result
+from core.metrics import START_CHAT_TOTAL
 from db.session import get_db, get_read_db
 from fastapi import (
     APIRouter,
@@ -161,6 +162,76 @@ async def chat(
         session_id=session_id,
         audit_log_id=audit_log_id,
     )
+
+
+@router.post("/student/{student_id}/start-chat")
+async def start_chat(
+    student_id: UUID,
+    payload: dict, # { book_id }
+    db: Session = Depends(get_db),
+    x_user_id: str = Header(...),
+    x_faculty_id: Optional[str] = Header(None),
+    x_semester_id: Optional[str] = Header(None),
+):
+    if str(student_id) != x_user_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    book_id = UUID(payload.get("book_id"))
+
+    # 1. Verify selection via internal call to library-service
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(
+                f"{settings.LIBRARY_SERVICE_URL}/student/verify-selection/{student_id}/{book_id}"
+            )
+            if resp.status_code != 200 or not resp.json().get("is_selected"):
+                raise HTTPException(status_code=400, detail="Book is not selected by student")
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail="Failed to verify book selection")
+        except Exception as e:
+             raise HTTPException(status_code=500, detail=f"Selection verification error: {e}")
+
+    # 2. Create session scoped to this book
+    from repository import chat_repository
+    collection_name = payload.get("collection_name", "academic")
+
+    session = chat_repository.create_chat_session(
+        db,
+        user_id=x_user_id,
+        collection_name=collection_name,
+        faculty_id=x_faculty_id,
+        semester_id=x_semester_id,
+        book_id=book_id
+    )
+
+    START_CHAT_TOTAL.inc()
+
+    log_audit(x_user_id, "START_BOOK_CHAT", "chat_session", str(session.id), metadata={"book_id": str(book_id)})
+
+    return {"session_id": session.id, "book_id": book_id}
+
+
+@router.post("/internal/sessions/invalidate")
+async def invalidate_sessions(
+    payload: dict, # { user_id, book_id }
+    db: Session = Depends(get_db)
+):
+    """
+    Invalidates active chat sessions for a user tied to a specific book.
+    Triggered when a book is removed or profile changes.
+    """
+    from repository import chat_repository
+    user_id = payload.get("user_id")
+    book_id = payload.get("book_id")
+
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    # If book_id is provided, invalidate sessions for that book
+    # If not, invalidate ALL sessions for the user (profile change case)
+    chat_repository.invalidate_user_sessions(db, UUID(user_id), UUID(book_id) if book_id else None)
+
+    return {"status": "sessions invalidated"}
 
 
 @router.post("/feedback")

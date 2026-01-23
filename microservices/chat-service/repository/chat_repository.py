@@ -20,6 +20,7 @@ def create_chat_session(
     collection_name: str = None,
     faculty_id: str = None,
     semester_id: str = None,
+    book_id: UUID = None,
 ):
     session = ChatSession(
         id=uuid4(),
@@ -27,6 +28,7 @@ def create_chat_session(
         collection_name=collection_name,
         faculty_id=faculty_id,
         semester_id=semester_id,
+        book_id=book_id,
     )
     db.add(session)
     db.commit()
@@ -85,6 +87,21 @@ def soft_delete_session(db: Session, session_id: UUID, user_id: str):
         db.commit()
         return True
     return False
+
+
+def invalidate_user_sessions(db: Session, user_id: UUID, book_id: UUID = None):
+    query = db.query(ChatSession).filter(
+        ChatSession.user_id == user_id,
+        ChatSession.is_deleted.is_(None)
+    )
+    if book_id:
+        query = query.filter(ChatSession.book_id == book_id)
+
+    sessions = query.all()
+    now = datetime.utcnow()
+    for session in sessions:
+        session.is_deleted = now
+    db.commit()
 
 
 def create_answer_audit_log(
